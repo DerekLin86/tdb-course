@@ -1,0 +1,69 @@
+<nav class="app-navbar">
+  <div class="brand-group">
+    <a routerLink="/kiosk" class="brand-link">
+      <span class="brand-logo">TDB</span>
+      <span class="brand-title sr-only">Triple-D 芭蕾舞蹈教室</span>
+    </a>
+  </div>
+
+  <div class="nav-right">
+    <div class="nav-links">
+      <a
+        routerLink="/kiosk"
+        routerLinkActive="active"
+        class="nav-link"
+      >
+        Kiosk 簽到
+      </a>
+
+      <a
+        routerLink="/student"
+        routerLinkActive="active"
+        class="nav-link"
+      >
+        學員專區
+      </a>
+
+      <a
+        routerLink="/admin"
+        routerLinkActive="active"
+        class="nav-link"
+      >
+        老師後台
+      </a>
+
+      <span class="user-greeting">Hi, {{ state.currentStudent()?.name || '學員' }}</span>
+    </div>
+
+    <!-- 靜態模擬控制器 (簡約優雅風格) -->
+    <div class="sim-pill-group">
+      <span class="sim-label">開課倒數</span>
+      <button
+        type="button"
+        class="sim-btn"
+        [class.active]="hours() >= 24"
+        (click)="setHours(36)"
+        title="開課前 36 小時（24h 前請假不扣堂）"
+      >
+        36h
+      </button>
+      <button
+        type="button"
+        class="sim-btn"
+        [class.active]="hours() < 24"
+        (click)="setHours(12)"
+        title="開課前 12 小時（24h 內請假扣 1 堂防虧損）"
+      >
+        12h
+      </button>
+      <button
+        type="button"
+        class="sim-reset-btn"
+        (click)="resetData()"
+        title="重設資料"
+      >
+        重置
+      </button>
+    </div>
+  </div>
+</nav>

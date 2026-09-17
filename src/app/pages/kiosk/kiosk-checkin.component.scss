@@ -1,0 +1,298 @@
+.kiosk-wrapper {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem 4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.5rem;
+}
+
+// 核心主視覺卡片（對標參考圖中之白色懸浮卡片）
+.hero-card {
+  background: #ffffff;
+  border-radius: 32px;
+  padding: 3rem 2.5rem 2.5rem;
+  width: 100%;
+  max-width: 580px;
+  text-align: center;
+  box-shadow: 0 20px 50px -10px rgba(45, 62, 80, 0.08), 0 1px 4px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+
+  .hero-title {
+    margin: 0;
+    font-size: 2.8rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+    color: #2b3a4a;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  }
+
+  .hero-tagline {
+    margin: 1.25rem 0 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #5a6b7c;
+    letter-spacing: 0.02em;
+  }
+
+  .hero-subtitle {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #7b8b9c;
+    line-height: 1.5;
+    max-width: 440px;
+  }
+
+  .hero-meta-bar {
+    margin-top: 1.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem;
+
+    .meta-pill {
+      background: #f4f7fa;
+      padding: 0.4rem 0.85rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      color: #556575;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+
+      &.highlight {
+        background: #fdf2f4;
+        color: #8e5b69;
+        font-weight: 600;
+      }
+    }
+  }
+}
+
+// 簽到區塊
+.roster-section {
+  width: 100%;
+
+  .section-heading {
+    text-align: center;
+    margin-bottom: 1.75rem;
+
+    .section-title {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #2b3a4a;
+    }
+
+    .section-subtitle {
+      margin: 0.4rem 0 0;
+      font-size: 0.95rem;
+      color: #7b8b9c;
+    }
+  }
+}
+
+// 學員卡片網格
+.students-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.25rem;
+}
+
+.student-card {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 1.4rem;
+  box-shadow: 0 10px 30px -5px rgba(50, 70, 90, 0.05);
+  border: 1px solid #e7edf3;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 200px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 35px -5px rgba(50, 70, 90, 0.09);
+    border-color: #d1dde8;
+  }
+
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+
+    .student-name {
+      margin: 0;
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #223140;
+    }
+  }
+
+  .status-badge {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.25rem 0.6rem;
+    border-radius: 12px;
+
+    &.badge-attended {
+      background: #eef7f2;
+      color: #2b704c;
+    }
+
+    &.badge-leave {
+      background: #f1f4f7;
+      color: #64748b;
+    }
+
+    &.badge-late {
+      background: #fdf2f2;
+      color: #b91c1c;
+    }
+
+    &.badge-pending {
+      background: #fdf5f7;
+      color: #8e5b69;
+    }
+  }
+
+  .card-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem 0;
+
+    .btn-sign {
+      background: #8e5b69;
+      color: #ffffff;
+      border: none;
+      padding: 0.65rem 1.6rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      box-shadow: 0 4px 12px rgba(142, 91, 105, 0.25);
+
+      &:hover {
+        background: #784855;
+        transform: translateY(-1px);
+      }
+    }
+
+    .sig-display {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+
+      .sig-caption {
+        font-size: 0.75rem;
+        color: #8c9ba8;
+      }
+
+      .sig-image {
+        max-width: 140px;
+        height: 48px;
+        object-fit: contain;
+        background: #ffffff;
+      }
+
+      .sig-time {
+        font-size: 0.8rem;
+        color: #617384;
+      }
+    }
+
+    .leave-notice {
+      text-align: center;
+      color: #64748b;
+
+      .notice-title {
+        display: block;
+        font-size: 0.95rem;
+        font-weight: 600;
+      }
+
+      .notice-sub {
+        font-size: 0.8rem;
+        color: #94a3b8;
+      }
+
+      &.late {
+        color: #b91c1c;
+
+        .notice-sub {
+          color: #dc2626;
+        }
+      }
+    }
+  }
+
+  .card-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.85rem;
+    color: #64748b;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 0.6rem;
+
+    .pack-status strong {
+      color: #8e5b69;
+      font-size: 1.05rem;
+    }
+
+    .pack-date {
+      font-size: 0.75rem;
+      color: #94a3b8;
+    }
+  }
+
+  &.card-attended {
+    border-color: #d1e7dd;
+    background: #fafdfb;
+  }
+
+  &.card-leave {
+    background: #fbfcfd;
+    opacity: 0.8;
+  }
+}
+
+.toast-card {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #24303e;
+  color: #ffffff;
+  padding: 0.85rem 1.75rem;
+  border-radius: 30px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  z-index: 10000;
+  animation: fadeUp 0.25s ease-out;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 15px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}

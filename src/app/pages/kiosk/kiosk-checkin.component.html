@@ -1,0 +1,122 @@
+<div class="kiosk-wrapper">
+  <!-- 仿照品牌參考圖之核心主視覺卡片 -->
+  <header class="hero-card">
+    <h1 class="hero-title">Triple Dream<br>Ballet</h1>
+    <p class="hero-tagline">Grace, Poise, Elegance.</p>
+    <p class="hero-subtitle">
+      {{ session().title }}
+    </p>
+
+    <div class="hero-meta-bar">
+      <div class="meta-pill">
+        <span class="meta-icon">📅</span>
+        <span>{{ session().date }} ({{ session().dayOfWeek }}) {{ session().startTime }} ~ {{ session().endTime }}</span>
+      </div>
+      <div class="meta-pill">
+        <span class="meta-icon">📍</span>
+        <span>{{ session().venueName }}</span>
+      </div>
+      <div class="meta-pill highlight">
+        <span>實到 {{ financials().actualAttendedCount }} / 應到 {{ financials().expectedAttendees }} 人</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 教室學員簽到區域 -->
+  <section class="roster-section">
+    <div class="section-heading">
+      <h2 class="section-title">課堂手寫簽到台</h2>
+      <p class="section-subtitle">請學員點選您的大名，於手寫板完成簽名以確認到課</p>
+    </div>
+
+    <div class="students-grid">
+      @for (item of attendanceList(); track item.student.id) {
+        <div
+          class="student-card"
+          [class.card-attended]="item.status === 'attended'"
+          [class.card-leave]="item.status === 'leave_advance' || item.status === 'leave_late'"
+          [class.card-pending]="item.status === 'registered'"
+          (click)="openSignModal(item)"
+        >
+          <div class="card-top">
+            <h3 class="student-name">{{ item.student.name }}</h3>
+            @switch (item.status) {
+              @case ('attended') {
+                <span class="status-badge badge-attended">已簽到</span>
+              }
+              @case ('leave_advance') {
+                <span class="status-badge badge-leave">已請假</span>
+              }
+              @case ('leave_late') {
+                <span class="status-badge badge-late">逾期請假</span>
+              }
+              @default {
+                <span class="status-badge badge-pending">待簽到</span>
+              }
+            }
+          </div>
+
+          <div class="card-center">
+            @if (item.status === 'attended') {
+              <div class="sig-display">
+                <span class="sig-caption">本人簽名存根</span>
+                @if (item.signatureDataUrl) {
+                  <img
+                    [src]="item.signatureDataUrl"
+                    [alt]="item.student.name + ' 簽名'"
+                    class="sig-image"
+                  />
+                }
+                <span class="sig-time">{{ item.signedAt }}</span>
+              </div>
+            } @else if (item.status === 'leave_advance') {
+              <div class="leave-notice">
+                <span class="notice-title">提前請假保留</span>
+                <span class="notice-sub">24h 前提出，不扣堂數</span>
+              </div>
+            } @else if (item.status === 'leave_late') {
+              <div class="leave-notice late">
+                <span class="notice-title">逾期請假扣堂</span>
+                <span class="notice-sub">未達 24h 前，依場租規定扣抵</span>
+              </div>
+            } @else {
+              <button
+                type="button"
+                class="btn-sign"
+                (click)="$event.stopPropagation(); openSignModal(item)"
+              >
+                手寫簽到
+              </button>
+            }
+          </div>
+
+          <div class="card-bottom">
+            <span class="pack-status">
+              剩餘 <strong>{{ item.activePack?.remainingCount ?? 0 }}</strong> 堂
+            </span>
+            @if (item.activePack) {
+              <span class="pack-date">至 {{ item.activePack.expiryDate }}</span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- 手寫簽名彈窗 -->
+  @if (activeStudentForSigning(); as active) {
+    <app-signature-pad
+      [studentName]="active.student.name"
+      [remainingCount]="active.remainingCount"
+      (signed)="handleSignatureSaved($event)"
+      (cancelled)="closeSignModal()"
+    />
+  }
+
+  <!-- 簽到成功通知 -->
+  @if (toastMessage(); as msg) {
+    <div class="toast-card">
+      {{ msg }}
+    </div>
+  }
+</div>

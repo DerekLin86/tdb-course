@@ -1,0 +1,71 @@
+<div class="signature-modal-backdrop" (click)="onCancel()">
+  <div class="signature-modal-card" (click)="$event.stopPropagation()">
+    <!-- 彈窗頂部標題 -->
+    <header class="modal-header">
+      <div class="title-group">
+        <h2 class="modal-title">
+          請 <span class="highlight-name">{{ studentName() }}</span> 在下方簽名
+        </h2>
+        <p class="modal-subtitle">
+          簽到完成將扣抵 1 堂課（簽到後剩餘 {{ remainingCount() - 1 }} 堂）
+        </p>
+      </div>
+      <button
+        type="button"
+        class="close-button"
+        (click)="onCancel()"
+        aria-label="關閉"
+      >
+        ✕
+      </button>
+    </header>
+
+    <!-- 簽名畫布主體 -->
+    <div class="canvas-wrapper">
+      <canvas
+        #signatureCanvas
+        class="signature-canvas"
+        (pointerdown)="onPointerDown($event)"
+        (pointermove)="onPointerMove($event)"
+        (pointerup)="onPointerUp($event)"
+        (pointercancel)="onPointerUp($event)"
+      ></canvas>
+
+      @if (!hasSignature()) {
+        <div class="canvas-placeholder-hint">
+          <span>請使用手指或觸控筆於線上方完成簽名</span>
+        </div>
+      }
+
+      <div class="guide-baseline">
+        <span class="baseline-text">簽名基準線</span>
+      </div>
+    </div>
+
+    <!-- 錯誤提示 -->
+    @if (errorMessage()) {
+      <div class="error-banner">
+        {{ errorMessage() }}
+      </div>
+    }
+
+    <!-- 操作按鈕 -->
+    <footer class="modal-actions">
+      <button
+        type="button"
+        class="btn-clear"
+        (click)="clearSignature()"
+      >
+        清除重簽
+      </button>
+
+      <button
+        type="button"
+        class="btn-confirm"
+        (click)="confirmSignature()"
+      >
+        確認簽到
+      </button>
+    </footer>
+  </div>
+</div>
