@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import { BalletStateService } from '../../services/ballet-state.service';
+import { BalletStateService } from '@libs/ballet/data-access';
 
 @Component({
   selector: 'app-navbar',

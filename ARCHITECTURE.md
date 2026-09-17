@@ -8,7 +8,9 @@
 ## 1. System Overview
 
 - **專案定位**：Triple Dream Ballet (TDB) 熟齡成人芭蕾課堂管理系統。核心提供教室現場 iPad 數位手寫簽名簽到台（模式 A）、學員手機端極簡 24 小時請假與票卡查詢、以及老師端場租防虧損開班門檻監控後台。
+- **架構模式**：Nx Monorepo (`apps/` 應用外殼與 `libs/` 模組化領域庫)。
 - **技術棧 (Tech Stack)**：
+  - **Monorepo 工具**：Nx 20.4+
   - **框架**：Angular 20+ (Standalone Components, Angular Signals)
   - **語言**：TypeScript 5.6+
   - **樣式**：SCSS（全域變數與 Design Tokens）
@@ -28,28 +30,42 @@
 
 ```
 triple-d-ballet-class/
-├── src/
-│   ├── app/
-│   │   ├── types/                  # 全域資料合約與型別定義 (SSOT)
-│   │   │   ├── student.type.ts     # 學員與 5/10 堂票卡資料結構
-│   │   │   ├── attendance.type.ts  # 課堂、出勤紀錄、財務損益指標型別
-│   │   │   └── signature-pad.type.ts # 手寫簽名板配置介面
-│   │   ├── services/               # 核心業務邏輯與狀態流
-│   │   │   └── ballet-state.service.ts # 基於 Signal 的狀態管理器，整合 LocalStorage
-│   │   ├── components/             # 可重用 UI 元件
-│   │   │   ├── navbar/             # TDB 極簡頂部導覽與時鐘控制器
-│   │   │   └── signature-pad/      # 具備高 DPI、防手勢誤觸之平滑手寫畫布
-│   │   ├── pages/                  # 三大核心業務路由
-│   │   │   ├── kiosk/              # 教室門口 iPad 手寫簽名簽到台 (模式 A)
-│   │   │   ├── student/            # 學員手機端 (LINE 友善免密碼請假與查堂)
-│   │   │   └── admin/              # 老師管理後台 (場租防虧門檻、簽名存根、儲值)
-│   │   ├── app.component.ts/.html/.scss
-│   │   ├── app.routes.ts
-│   │   └── app.config.ts
-│   ├── styles.scss                 # 全域 Design Tokens 與基底重置樣式
-│   └── main.ts
-├── ARCHITECTURE.md                 # 專案架構索引地圖 (本文件)
-├── AGENTS.md                       # 本地 Agent 行為規範與 Brain 串接指南
+├── apps/
+│   └── triple-d-ballet-class/       # 應用程式外殼 (Shell Application)
+│       ├── src/
+│       │   ├── app/
+│       │   │   ├── app.component.ts/.html/.scss
+│       │   │   ├── app.routes.ts    # 路由定義 (Lazy load @libs/ballet/feature)
+│       │   │   └── app.config.ts
+│       │   ├── styles.scss          # 全域 Design Tokens 與主題變數
+│       │   └── main.ts
+│       └── project.json
+├── libs/
+│   ├── ballet/
+│   │   ├── data-access/             # [type:data-access, scope:ballet]
+│   │   │   ├── src/
+│   │   │   │   ├── types/           # 全域資料合約 (Student, Attendance, Signature)
+│   │   │   │   ├── services/        # BalletStateService (Signals + LocalStorage)
+│   │   │   │   └── index.ts         # 唯一對外導出進入點 (@libs/ballet/data-access)
+│   │   │   └── project.json
+│   │   └── feature/                 # [type:feature, scope:ballet]
+│   │       ├── src/
+│   │       │   ├── kiosk/           # iPad 簽到台元件 (模式 A 手寫簽名)
+│   │       │   ├── student/         # 學員手機端請假查堂元件
+│   │       │   ├── admin/           # 老師管理後台元件 (門檻警報與簽名存根)
+│   │       │   └── index.ts         # 唯一對外導出進入點 (@libs/ballet/feature)
+│   │       └── project.json
+│   └── shared/
+│       └── ui/                      # [type:ui, scope:shared]
+│           ├── src/
+│           │   ├── navbar/          # TDB 極簡導覽列與即時時鐘
+│           │   ├── signature-pad/   # 貝茲曲線高平滑手寫簽名板
+│           │   └── index.ts         # 唯一對外導出進入點 (@libs/shared/ui)
+│           └── project.json
+├── nx.json                          # Nx 設定 (defaultBase: main, useDaemonProcess: false)
+├── tsconfig.base.json               # Nx 路徑別名映射 (@libs/...)
+├── ARCHITECTURE.md                  # 專案架構索引地圖 (本文件)
+├── AGENTS.md                        # 本地 Agent 行為規範與 Brain 串接指南
 └── package.json
 ```
 
@@ -57,15 +73,25 @@ triple-d-ballet-class/
 
 ## 3. Boundary & Coding Rules
 
-1. **Angular Signals 架構**：
+1. **Nx Monorepo 依賴邊界規範**：
+   - 所有跨模組參照一律使用 `tsconfig.base.json` 的路徑別名：
+     - `@libs/ballet/data-access`
+     - `@libs/shared/ui`
+     - `@libs/ballet/feature`
+   - 嚴禁越界使用相對路徑跨庫參照（例如 `../../libs/shared/ui`）。
+   - 庫標籤 (Tags) 約束：
+     - `ballet-data-access`: `type:data-access`, `scope:ballet`
+     - `shared-ui`: `type:ui`, `scope:shared`（可被所有 scope 庫或應用參照）
+     - `ballet-feature`: `type:feature`, `scope:ballet`（只供 ballet 應用與路由載入）
+2. **Angular Signals 架構**：
    - 狀態管理全面使用 `signal` 與 `computed`。
    - 元件 Inputs/Outputs 一律使用 Signal APIs：`input()`, `input.required()`, `output()`。
-2. **範本與樣式獨立原則**：
+3. **範本與樣式獨立原則**：
    - 每個元件必須將 HTML 統整至獨立 `.html` 檔案，嚴禁在 `.ts` 內使用 inline template。
    - 每個元件樣式一律使用獨立 `.scss` 檔案。
-3. **資料型別集中管理**：
-   - 元件間傳遞之 Props 與物件模型，一律於 `src/app/types/` 定義介面，禁止於元件內宣告臨時 any 或重複型別。
-4. **防虧損核心業務規則**：
+4. **資料型別集中管理**：
+   - 資料模型一律集中於 `libs/ballet/data-access/src/types/` 定義介面，禁止於元件內宣告臨時 any 或重複型別。
+5. **防虧損核心業務規則**：
    - **24 小時截止線**：距開課時間 $\ge 24$ 小時請假，出勤狀態為 `leave_advance`，扣抵堂數為 0；不足 24 小時請假，狀態為 `leave_late`，強制扣抵 1 堂以攤提固定場租。
    - **損益平衡門檻**：每堂課固定場租為 \$2,000，每人每堂收費折合 \$500，最低開班人數門檻為 4 人。當實到人數 $< 4$ 時，系統自動觸發虧損警報，支援老師一鍵順延停課並退還扣堂。
    - **手寫簽名存根**：學員於 iPad 簽到時必須手繪簽名，生成 Base64 PNG 永久綁定該課堂出勤紀錄，供老師後台調閱防範堂數爭議。
@@ -81,8 +107,8 @@ npm run validate:pr
 ```
 
 - **驗證項目**：
-  1. `npm run build`：全域 Angular 生產模式打包，必須維持 **0 Errors, 0 Warnings**。
-  2. `npm run test:ci`：Karma + ChromeHeadless 自動化單元測試，全數案例通過 (**100% SUCCESS**)。
+  1. `npm run build` (`nx build triple-d-ballet-class`)：全域生產模式打包，維持 **0 Errors, 0 Warnings**。
+  2. `npm run test:ci` (`nx run-many -t test --watch=false --browsers=ChromeHeadless`)：全專案自動化單元測試全數通過 (**100% SUCCESS**)。
 
 ---
 
@@ -90,14 +116,16 @@ npm run validate:pr
 
 | 功能 / 概念 | 對應檔案路徑 |
 | :--- | :--- |
-| **全域 Design Tokens & 樣式** | [`src/styles.scss`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/src/styles.scss) |
-| **路由設定** | [`src/app/app.routes.ts`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/src/app/app.routes.ts) |
-| **學員與票卡型別** | [`src/app/types/student.type.ts`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/src/app/types/student.type.ts) |
-| **出勤、課堂與損益型別** | [`src/app/types/attendance.type.ts`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/src/app/types/attendance.type.ts) |
-| **狀態流與業務核心服務** | [`src/app/services/ballet-state.service.ts`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/src/app/services/ballet-state.service.ts) |
-| **手寫簽名板元件** | [`src/app/components/signature-pad/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/src/app/components/signature-pad/) |
-| **TDB 極簡導覽列** | [`src/app/components/navbar/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/src/app/components/navbar/) |
-| **教室門口 iPad 簽到台** | [`src/app/pages/kiosk/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/src/app/pages/kiosk/) |
-| **學員手機請假端** | [`src/app/pages/student/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/src/app/pages/student/) |
-| **老師管理與損益後台** | [`src/app/pages/admin/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/src/app/pages/admin/) |
-| **單元測試套件** | [`src/app/services/ballet-state.service.spec.ts`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/src/app/services/ballet-state.service.spec.ts) |
+| **全域 Design Tokens & 樣式** | [`apps/triple-d-ballet-class/src/styles.scss`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/triple-d-ballet-class/src/styles.scss) |
+| **路由設定** | [`apps/triple-d-ballet-class/src/app/app.routes.ts`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/triple-d-ballet-class/src/app/app.routes.ts) |
+| **學員與票卡型別** | [`libs/ballet/data-access/src/types/student.type.ts`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/ballet/data-access/src/types/student.type.ts) |
+| **出勤、課堂與損益型別** | [`libs/ballet/data-access/src/types/attendance.type.ts`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/ballet/data-access/src/types/attendance.type.ts) |
+| **手寫簽名板設定型別** | [`libs/ballet/data-access/src/types/signature-pad.type.ts`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/ballet/data-access/src/types/signature-pad.type.ts) |
+| **狀態流與業務核心服務** | [`libs/ballet/data-access/src/services/ballet-state.service.ts`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/ballet/data-access/src/services/ballet-state.service.ts) |
+| **手寫簽名板 UI 元件** | [`libs/shared/ui/src/signature-pad/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/shared/ui/src/signature-pad/) |
+| **TDB 極簡導覽列 UI** | [`libs/shared/ui/src/navbar/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/shared/ui/src/navbar/) |
+| **教室門口 iPad 簽到台** | [`libs/ballet/feature/src/kiosk/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/ballet/feature/src/kiosk/) |
+| **學員手機請假端** | [`libs/ballet/feature/src/student/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/ballet/feature/src/student/) |
+| **老師管理與損益後台** | [`libs/ballet/feature/src/admin/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/ballet/feature/src/admin/) |
+| **資料存取層單元測試** | [`libs/ballet/data-access/src/services/ballet-state.service.spec.ts`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/ballet/data-access/src/services/ballet-state.service.spec.ts) |
+| **簽名板元件單元測試** | [`libs/shared/ui/src/signature-pad/signature-pad.component.spec.ts`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/shared/ui/src/signature-pad/signature-pad.component.spec.ts) |

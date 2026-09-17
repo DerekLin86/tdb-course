@@ -1,0 +1,85 @@
+{
+  "name": "triple-d-ballet-class",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "prefix": "app",
+  "sourceRoot": "apps/triple-d-ballet-class/src",
+  "tags": ["scope:ballet"],
+  "targets": {
+    "build": {
+      "executor": "@angular-devkit/build-angular:application",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/apps/triple-d-ballet-class",
+        "index": "apps/triple-d-ballet-class/src/index.html",
+        "browser": "apps/triple-d-ballet-class/src/main.ts",
+        "polyfills": ["zone.js"],
+        "tsConfig": "apps/triple-d-ballet-class/tsconfig.app.json",
+        "inlineStyleLanguage": "scss",
+        "assets": [
+          {
+            "glob": "**/*",
+            "input": "apps/triple-d-ballet-class/public"
+          }
+        ],
+        "styles": ["apps/triple-d-ballet-class/src/styles.scss"],
+        "scripts": []
+      },
+      "configurations": {
+        "production": {
+          "budgets": [
+            {
+              "type": "initial",
+              "maximumWarning": "500kB",
+              "maximumError": "1MB"
+            },
+            {
+              "type": "anyComponentStyle",
+              "maximumWarning": "20kB",
+              "maximumError": "30kB"
+            }
+          ],
+          "outputHashing": "all"
+        },
+        "development": {
+          "optimization": false,
+          "extractLicenses": false,
+          "sourceMap": true
+        }
+      },
+      "defaultConfiguration": "production"
+    },
+    "serve": {
+      "executor": "@angular-devkit/build-angular:dev-server",
+      "configurations": {
+        "production": {
+          "buildTarget": "triple-d-ballet-class:build:production"
+        },
+        "development": {
+          "buildTarget": "triple-d-ballet-class:build:development"
+        }
+      },
+      "defaultConfiguration": "development"
+    },
+    "test": {
+      "executor": "@angular-devkit/build-angular:karma",
+      "options": {
+        "polyfills": ["zone.js", "zone.js/testing"],
+        "tsConfig": "apps/triple-d-ballet-class/tsconfig.spec.json",
+        "inlineStyleLanguage": "scss",
+        "include": [
+          "apps/triple-d-ballet-class/src/**/*.spec.ts",
+          "libs/**/*.spec.ts"
+        ],
+        "assets": [
+          {
+            "glob": "**/*",
+            "input": "apps/triple-d-ballet-class/public"
+          }
+        ],
+        "styles": ["apps/triple-d-ballet-class/src/styles.scss"],
+        "scripts": []
+      }
+    }
+  }
+}

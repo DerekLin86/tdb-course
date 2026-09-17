@@ -1,0 +1,16 @@
+{
+  "name": "ballet-data-access",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/ballet/data-access/src",
+  "projectType": "library",
+  "tags": ["type:data-access", "scope:ballet"],
+  "targets": {
+    "test": {
+      "executor": "@angular-devkit/build-angular:karma",
+      "options": {
+        "polyfills": ["zone.js", "zone.js/testing"],
+        "tsConfig": "libs/ballet/data-access/tsconfig.spec.json"
+      }
+    }
+  }
+}

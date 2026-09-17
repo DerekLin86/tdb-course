@@ -10,7 +10,7 @@ import {
   HostListener
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { SignaturePadConfig } from '../../types/signature-pad.type';
+import { SignaturePadConfig } from '@libs/ballet/data-access';
 
 interface Point {
   x: number;

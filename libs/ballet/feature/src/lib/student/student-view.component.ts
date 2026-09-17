@@ -1,7 +1,7 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { BalletStateService } from '../../services/ballet-state.service';
+import { BalletStateService } from '@libs/ballet/data-access';
 
 @Component({
   selector: 'app-student-view',

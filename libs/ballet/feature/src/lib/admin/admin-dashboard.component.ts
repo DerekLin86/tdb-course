@@ -1,9 +1,9 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { BalletStateService } from '../../services/ballet-state.service';
-import { AttendanceStatus } from '../../types/attendance.type';
-import { StudentWithActivePack } from '../../types/student.type';
+import { BalletStateService } from '@libs/ballet/data-access';
+import { AttendanceStatus } from '@libs/ballet/data-access';
+import { StudentWithActivePack } from '@libs/ballet/data-access';
 
 @Component({
   selector: 'app-admin-dashboard',

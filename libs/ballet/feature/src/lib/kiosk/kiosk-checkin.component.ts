@@ -1,8 +1,8 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { BalletStateService } from '../../services/ballet-state.service';
-import { SignaturePadComponent } from '../../components/signature-pad/signature-pad.component';
-import { Student } from '../../types/student.type';
+import { BalletStateService } from '@libs/ballet/data-access';
+import { SignaturePadComponent } from '@libs/shared/ui';
+import { Student } from '@libs/ballet/data-access';
 
 @Component({
   selector: 'app-kiosk-checkin',

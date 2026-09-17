@@ -22,11 +22,11 @@
 
 ## 2. 專案開發與代碼規範 (Local Repository Rules)
 
-### Frontend & Angular 規範
+### Frontend, Angular & Nx 規範
 1. **元件範本分離**：每個元件一律將範本程式碼分離至獨立 `.html` 檔案，嚴禁於 `.ts` 內使用 inline template。
 2. **Angular Signal 架構**：元件狀態流與屬性傳遞全面採用 Signal (`signal`, `computed`, `effect`, `input`, `output`)。
-3. **型別抽離**：所有 Props 與業務介面統一定義於 `src/app/types/` 目錄。
-4. **共用優先原則**：若有重複程式碼，優先使用 `src/app/components/` 之共用元件（如 `signature-pad`、`navbar`）。
+3. **型別抽離**：所有 Props 與業務介面統一定義於 `libs/ballet/data-access/src/types/` 目錄。
+4. **共用優先與庫邊界原則**：重複使用的 UI 一律收納至 `libs/shared/ui/`（如 `signature-pad`、`navbar`），跨模組引用嚴格採用 `@libs/*` 路徑別名，並維持 library tag 隔離規則。
 5. **視覺風格一致性**：嚴格遵循 TDB 簡約高級感規範（安靜奢華 Quiet Luxury、煙燻玫瑰色 `#8e5b69`、冰霧藍灰環境漸層、大圓角懸浮白卡片），嚴禁使用花俏 Emoji 或高飽和度警示色。
 
 ---
@@ -39,7 +39,7 @@
 npm run validate:pr
 ```
 
-- 包含：`ng build`（0 警告、0 錯誤）與 `ng test:ci`（單元測試全數 PASS）。
+- 包含：`nx build triple-d-ballet-class`（0 警告、0 錯誤）與 `nx run-many -t test --watch=false --browsers=ChromeHeadless`（單元測試全數 PASS）。
 
 ---
 
