@@ -11,11 +11,12 @@
 - **架構模式**：Nx Monorepo (`apps/` 應用外殼與 `libs/` 模組化領域庫)。
 - **技術棧 (Tech Stack)**：
   - **Monorepo 工具**：Nx 20.4+
-  - **框架**：Angular 20+ (Standalone Components, Angular Signals)
-  - **語言**：TypeScript 5.6+
+  - **前端框架**：Angular 20+ (Standalone Components, Angular Signals)
+  - **後端框架**：Python FastAPI (RESTful API, Pydantic v2, SQLite WAL 持久化)
+  - **語言**：TypeScript 5.6+ / Python 3.13+
   - **樣式**：SCSS（全域變數與 Design Tokens）
   - **繪圖**：HTML5 Canvas 原生手寫貝茲平滑畫布 (Signature Pad)
-  - **測試**：Jasmine + Karma + ChromeHeadless
+  - **測試**：Jasmine + Karma + ChromeHeadless (前端) / Pytest (後端)
 - **視覺規範 (Visual Aesthetics)**：
   - **風格定位**：TDB 簡約高級感（Quiet Luxury / Modern Elegance）。
   - **背景**：靈動冰霧藍灰環境漸層 `radial-gradient(circle at 50% 18%, #f0f4f9 0%, #e3eaf2 55%, #d8e2ed 100%)`。
@@ -31,12 +32,21 @@
 ```
 triple-d-ballet-class/
 ├── apps/
-│   └── triple-d-ballet-class/       # 應用程式外殼 (Shell Application)
+│   ├── api/                         # 後端應用 (Python FastAPI + SQLite)
+│   │   ├── main.py                  # FastAPI 主程式、CORS、Routers 掛載
+│   │   ├── database.py              # SQLite 資料庫連線與 Session
+│   │   ├── models/                  # SQLAlchemy / SQLite 資料模型
+│   │   ├── schemas/                 # Pydantic v2 CamelCase 序列化合約
+│   │   ├── routers/                 # RESTful 端點 (students, sessions, attendance, system)
+│   │   ├── services/                # 業務邏輯 (24h 請假、堂數扣抵、場租損益、簽名存根)
+│   │   ├── tests/                   # Pytest 自動化整合與對抗性測試
+│   │   └── project.json             # Nx 專案目標 (api:test)
+│   └── triple-d-ballet-class/       # 前端應用外殼 (Shell Application)
 │       ├── src/
 │       │   ├── app/
 │       │   │   ├── app.component.ts/.html/.scss
 │       │   │   ├── app.routes.ts    # 路由定義 (Lazy load @libs/ballet/feature)
-│       │   │   └── app.config.ts
+│       │   │   └── app.config.ts    # provideHttpClient(withFetch())
 │       │   ├── styles.scss          # 全域 Design Tokens 與主題變數
 │       │   └── main.ts
 │       └── project.json
@@ -129,3 +139,10 @@ npm run validate:pr
 | **老師管理與損益後台** | [`libs/ballet/feature/src/admin/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/ballet/feature/src/admin/) |
 | **資料存取層單元測試** | [`libs/ballet/data-access/src/services/ballet-state.service.spec.ts`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/ballet/data-access/src/services/ballet-state.service.spec.ts) |
 | **簽名板元件單元測試** | [`libs/shared/ui/src/signature-pad/signature-pad.component.spec.ts`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/shared/ui/src/signature-pad/signature-pad.component.spec.ts) |
+| **後端 FastAPI 主程式** | [`apps/api/main.py`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/main.py) |
+| **後端 SQLite 資料庫連線** | [`apps/api/database.py`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/database.py) |
+| **後端 RESTful 路由群組** | [`apps/api/routers/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/routers/) |
+| **後端業務邏輯服務** | [`apps/api/services/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/services/) |
+| **後端 Pytest 整合測試** | [`apps/api/tests/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/tests/) |
+| **前端 HTTP API Client** | [`libs/ballet/data-access/src/lib/services/ballet-api.service.ts`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/ballet/data-access/src/lib/services/ballet-api.service.ts) |
+| **API 介面資料型別合約** | [`libs/ballet/data-access/src/lib/types/api.type.ts`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/ballet/data-access/src/lib/types/api.type.ts) |

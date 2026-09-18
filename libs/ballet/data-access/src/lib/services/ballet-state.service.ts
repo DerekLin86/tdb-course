@@ -1,6 +1,8 @@
-import { Injectable, signal, computed, effect } from '@angular/core';
+import { Injectable, signal, computed, effect, inject } from '@angular/core';
+import { forkJoin, of, catchError } from 'rxjs';
 import { Student, TicketPack, StudentWithActivePack, TicketPackType } from '../types/student.type';
 import { AttendanceRecord, AttendanceStatus, ClassSession, SessionFinancialStats } from '../types/attendance.type';
+import { BalletApiService } from './ballet-api.service';
 
 const STORAGE_KEY = 'triple_d_ballet_state_v1';
 
@@ -8,11 +10,18 @@ const STORAGE_KEY = 'triple_d_ballet_state_v1';
   providedIn: 'root'
 })
 export class BalletStateService {
+  private readonly api = inject(BalletApiService, { optional: true });
+
   // 基礎 Signals
   readonly students = signal<Student[]>([]);
   readonly ticketPacks = signal<TicketPack[]>([]);
   readonly sessions = signal<ClassSession[]>([]);
   readonly attendance = signal<AttendanceRecord[]>([]);
+
+  // 遠端同步 Signals
+  readonly isSyncing = signal<boolean>(false);
+  readonly isOnline = signal<boolean>(true);
+  readonly lastSyncError = signal<string | null>(null);
 
   // 當前選取狀態
   readonly selectedSessionId = signal<string>('session-upcoming');
@@ -189,6 +198,69 @@ export class BalletStateService {
         console.warn('Could not save to localStorage', e);
       }
     });
+
+    // 若 API 模組可用，啟動時向後端嘗試獲取最新資料進行比對重整
+    if (this.api?.isAvailable) {
+      this.refreshFromBackend();
+    }
+  }
+
+  // 從後端 FastAPI 服務重整最新資料
+  refreshFromBackend(): void {
+    if (!this.api || !this.api.isAvailable) return;
+    this.isSyncing.set(true);
+
+    let syncError: string | null = null;
+    forkJoin({
+      students: this.api.getStudents().pipe(catchError(err => {
+        syncError = err?.message || 'API sync failed';
+        return of(null);
+      })),
+      sessions: this.api.getSessions().pipe(catchError(err => {
+        if (!syncError) syncError = err?.message || 'API sync failed';
+        return of(null);
+      }))
+    }).subscribe({
+      next: ({ students, sessions }) => {
+        if (students && sessions) {
+          this.isOnline.set(true);
+          this.lastSyncError.set(null);
+          this.students.set(students);
+          this.sessions.set(sessions);
+
+          // 從學員中提取 active 票卡
+          const packs: TicketPack[] = [];
+          for (const s of students) {
+            if (s.activePack) {
+              packs.push(s.activePack);
+            }
+          }
+          if (packs.length > 0) {
+            this.ticketPacks.set(packs);
+          }
+
+          // 抓取當前選取課堂的出勤資料
+          const curr = this.currentSession();
+          if (curr) {
+            this.api!.getSessionAttendance(curr.id).pipe(catchError(() => of([]))).subscribe(records => {
+              if (records && records.length > 0) {
+                this.attendance.set(records);
+              }
+            });
+          }
+        } else {
+          this.isOnline.set(false);
+          this.lastSyncError.set(syncError || 'API sync failed');
+        }
+        this.isSyncing.set(false);
+      },
+      error: (err) => {
+        this.isOnline.set(false);
+        this.isSyncing.set(false);
+        this.lastSyncError.set(err?.message || 'API sync failed');
+        console.warn('Ballet API sync failed, continuing in offline/demo mode', err);
+      }
+    });
   }
 
   // 手寫簽名簽到核心 (iPad 模式 A)
@@ -207,7 +279,7 @@ export class BalletStateService {
     const now = new Date();
     const timeString = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
 
-    // 1. 扣抵票卡 1 堂
+    // 1. 本地立即扣抵票卡 1 堂 (樂觀更新)
     const updatedPacks = this.ticketPacks().map(p => {
       if (p.id === pack.id) {
         const remaining = p.remainingCount - 1;
@@ -221,7 +293,7 @@ export class BalletStateService {
     });
     this.ticketPacks.set(updatedPacks);
 
-    // 2. 更新或新增出席紀錄
+    // 2. 本地立即更新或新增出席紀錄
     const existingRecIndex = this.attendance().findIndex(
       a => a.sessionId === session.id && a.studentId === studentId
     );
@@ -244,6 +316,21 @@ export class BalletStateService {
       this.attendance.set(updatedAtt);
     } else {
       this.attendance.set([...this.attendance(), newRecord]);
+    }
+
+    // 3. 背景非同步同步至後端 API
+    if (this.api?.isAvailable) {
+      this.api.checkIn(session.id, studentId, signatureDataUrl).subscribe({
+        next: (res) => {
+          if (res.record) {
+            this.upsertAttendance(res.record);
+          }
+        },
+        error: (err) => {
+          console.warn('Background check-in sync failed', err);
+          this.lastSyncError.set(err.message || '簽到同步失敗');
+        }
+      });
     }
 
     return { success: true, message: `✅ ${student.name} 簽到成功！剩餘 ${pack.remainingCount - 1} 堂。` };
@@ -278,6 +365,22 @@ export class BalletStateService {
       };
 
       this.upsertAttendance(newRecord);
+
+      // 背景非同步同步至後端 API
+      if (this.api?.isAvailable) {
+        this.api.requestLeave(session.id, studentId, reason, hoursLeft).subscribe({
+          next: (res) => {
+            if (res.record) {
+              this.upsertAttendance(res.record);
+            }
+          },
+          error: (err) => {
+            console.warn('Background leave request sync failed', err);
+            this.lastSyncError.set(err.message || '請假同步失敗');
+          }
+        });
+      }
+
       return {
         success: true,
         isAdvance: true,
@@ -313,6 +416,22 @@ export class BalletStateService {
       };
 
       this.upsertAttendance(newRecord);
+
+      // 背景非同步同步至後端 API
+      if (this.api?.isAvailable) {
+        this.api.requestLeave(session.id, studentId, reason, hoursLeft).subscribe({
+          next: (res) => {
+            if (res.record) {
+              this.upsertAttendance(res.record);
+            }
+          },
+          error: (err) => {
+            console.warn('Background leave request sync failed', err);
+            this.lastSyncError.set(err.message || '請假同步失敗');
+          }
+        });
+      }
+
       return {
         success: true,
         isAdvance: false,
@@ -348,6 +467,16 @@ export class BalletStateService {
       a => !(a.sessionId === session.id && a.studentId === studentId)
     );
     this.attendance.set(filtered);
+
+    // 背景非同步同步至後端 API
+    if (this.api?.isAvailable) {
+      this.api.cancelLeave(session.id, studentId).subscribe({
+        error: (err) => {
+          console.warn('Background cancel leave sync failed', err);
+          this.lastSyncError.set(err.message || '取消請假同步失敗');
+        }
+      });
+    }
   }
 
   // 老師手動操作 (如直接幫忙記出席或特例免扣堂)
@@ -367,6 +496,21 @@ export class BalletStateService {
       remark: '老師後台手動變更'
     };
     this.upsertAttendance(newRecord);
+
+    // 背景非同步同步至後端 API
+    if (this.api?.isAvailable) {
+      this.api.updateAttendanceStatus(session.id, studentId, status, '老師後台手動變更').subscribe({
+        next: (record) => {
+          if (record) {
+            this.upsertAttendance(record);
+          }
+        },
+        error: (err) => {
+          console.warn('Background update attendance sync failed', err);
+          this.lastSyncError.set(err.message || '更新出勤狀態同步失敗');
+        }
+      });
+    }
   }
 
   // 加購票卡 (5 堂 / 10 堂)
@@ -379,7 +523,6 @@ export class BalletStateService {
     const purchaseDate = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
     const expiryDate = `${expiry.getFullYear()}-${pad(expiry.getMonth() + 1)}-${pad(expiry.getDate())}`;
 
-    // 先將先前的 active 票卡結案或展延
     const newPack: TicketPack = {
       id: `pack-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       studentId,
@@ -393,6 +536,22 @@ export class BalletStateService {
     };
 
     this.ticketPacks.set([...this.ticketPacks(), newPack]);
+
+    // 背景非同步同步至後端 API
+    if (this.api?.isAvailable) {
+      this.api.purchaseTicketPack({
+        studentId,
+        type,
+        totalCount: count,
+        validityDays,
+        pricePaid: count * 500
+      }).subscribe({
+        error: (err) => {
+          console.warn('Background purchase ticket pack sync failed', err);
+          this.lastSyncError.set(err.message || '購票同步失敗');
+        }
+      });
+    }
   }
 
   // 展延票卡效期
@@ -412,6 +571,16 @@ export class BalletStateService {
       return p;
     });
     this.ticketPacks.set(updated);
+
+    // 背景非同步同步至後端 API
+    if (this.api?.isAvailable) {
+      this.api.extendTicketPack(packId, extraDays).subscribe({
+        error: (err) => {
+          console.warn('Background extend ticket pack sync failed', err);
+          this.lastSyncError.set(err.message || '展延票卡同步失敗');
+        }
+      });
+    }
   }
 
   // 開班門檻不足時，老師一鍵順延/停課 (避免場租損失)
@@ -445,6 +614,16 @@ export class BalletStateService {
       }
     }
     this.ticketPacks.set(packs);
+
+    // 背景非同步同步至後端 API
+    if (this.api?.isAvailable) {
+      this.api.cancelSessionDueToThreshold(sessionId).subscribe({
+        error: (err) => {
+          console.warn('Background cancel session sync failed', err);
+          this.lastSyncError.set(err.message || '順延停課同步失敗');
+        }
+      });
+    }
   }
 
   setSimulationHours(hours: number) {
@@ -472,6 +651,18 @@ export class BalletStateService {
   resetMockData() {
     localStorage.removeItem(STORAGE_KEY);
     this.loadInitialData();
+
+    // 背景非同步重置後端 API 資料庫
+    if (this.api?.isAvailable) {
+      this.api.resetSystem().subscribe({
+        next: () => {
+          this.refreshFromBackend();
+        },
+        error: (err) => {
+          console.warn('Background reset system sync failed', err);
+        }
+      });
+    }
   }
 
   private loadInitialData() {

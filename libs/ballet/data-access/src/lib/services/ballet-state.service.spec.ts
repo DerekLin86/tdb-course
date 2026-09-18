@@ -1,7 +1,11 @@
 import { TestBed } from '@angular/core/testing';
+import { of, throwError } from 'rxjs';
 import { BalletStateService } from './ballet-state.service';
+import { BalletApiService } from './ballet-api.service';
+import { StudentWithActivePack, TicketPack } from '../types/student.type';
+import { ClassSession, AttendanceRecord } from '../types/attendance.type';
 
-describe('BalletStateService (防虧損與出缺勤業務邏輯測試)', () => {
+describe('BalletStateService (防虧損與出缺勤業務邏輯測試 - 單機無網路相容性)', () => {
   let service: BalletStateService;
 
   beforeEach(() => {
@@ -135,5 +139,213 @@ describe('BalletStateService (防虧損與出缺勤業務邏輯測試)', () => {
     service.extendPackExpiry(latestPack.id, 30);
     const renewedPack = service.ticketPacks().find(p => p.id === latestPack.id);
     expect(renewedPack!.expiryDate).not.toBe(oldExpiry);
+  });
+});
+
+describe('BalletStateService (後端 API 整合與非同步同步機制)', () => {
+  let service: BalletStateService;
+  let mockApi: jasmine.SpyObj<BalletApiService>;
+
+  const mockStudents: StudentWithActivePack[] = [
+    {
+      id: 'stu-remote-1',
+      name: '遠端學員1',
+      phone: '0900-111-222',
+      registeredAt: '2026-09-01',
+      activePack: {
+        id: 'pack-remote-1',
+        studentId: 'stu-remote-1',
+        type: '10_class',
+        totalCount: 10,
+        remainingCount: 8,
+        purchaseDate: '2026-09-01',
+        expiryDate: '2026-12-31',
+        status: 'active'
+      }
+    }
+  ];
+
+  const mockSessions: ClassSession[] = [
+    {
+      id: 'session-remote-1',
+      date: '2026-09-26',
+      dayOfWeek: '週六',
+      startTime: '14:00',
+      endTime: '15:30',
+      title: '遠端芭蕾課程',
+      venueName: '遠端舞蹈廳',
+      venueCost: 2000,
+      feePerStudent: 500,
+      maxCapacity: 10,
+      minThreshold: 4,
+      status: 'scheduled'
+    }
+  ];
+
+  const mockAttendance: AttendanceRecord[] = [
+    {
+      id: 'att-remote-1',
+      sessionId: 'session-remote-1',
+      studentId: 'stu-remote-1',
+      studentName: '遠端學員1',
+      status: 'attended',
+      deductedCount: 1
+    }
+  ];
+
+  beforeEach(() => {
+    localStorage.clear();
+
+    mockApi = jasmine.createSpyObj<BalletApiService>('BalletApiService', [
+      'getStudents',
+      'getSessions',
+      'getSessionAttendance',
+      'checkIn',
+      'requestLeave',
+      'cancelLeave',
+      'updateAttendanceStatus',
+      'purchaseTicketPack',
+      'extendTicketPack',
+      'cancelSessionDueToThreshold',
+      'resetSystem'
+    ], {
+      isAvailable: true,
+      baseUrl: 'http://localhost:8000/api/v1'
+    });
+
+    mockApi.getStudents.and.returnValue(of(mockStudents));
+    mockApi.getSessions.and.returnValue(of(mockSessions));
+    mockApi.getSessionAttendance.and.returnValue(of(mockAttendance));
+    mockApi.checkIn.and.returnValue(of({
+      success: true,
+      message: '簽到成功',
+      record: mockAttendance[0]
+    }));
+    mockApi.requestLeave.and.returnValue(of({
+      success: true,
+      message: '請假成功',
+      isAdvance: true,
+      deductedCount: 0,
+      record: { ...mockAttendance[0], status: 'leave_advance', deductedCount: 0 }
+    }));
+    mockApi.cancelLeave.and.returnValue(of({
+      success: true,
+      message: '取消請假成功',
+      refunded: false
+    }));
+    mockApi.updateAttendanceStatus.and.returnValue(of(mockAttendance[0]));
+    mockApi.purchaseTicketPack.and.returnValue(of(mockStudents[0].activePack!));
+    mockApi.extendTicketPack.and.returnValue(of(mockStudents[0].activePack!));
+    mockApi.cancelSessionDueToThreshold.and.returnValue(of({
+      message: '課堂已取消',
+      refundedCount: 1
+    }));
+    mockApi.resetSystem.and.returnValue(of({
+      message: '重置完成',
+      studentsCount: 10,
+      ticketPacksCount: 10,
+      sessionsCount: 2,
+      attendanceCount: 2
+    }));
+
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: BalletApiService, useValue: mockApi },
+        BalletStateService
+      ]
+    });
+
+    service = TestBed.inject(BalletStateService);
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('refreshFromBackend() 成功時應更新學生、課程與出勤狀態，並標記 isOnline 為 true', () => {
+    service.refreshFromBackend();
+
+    expect(mockApi.getStudents).toHaveBeenCalled();
+    expect(mockApi.getSessions).toHaveBeenCalled();
+    expect(service.isOnline()).toBeTrue();
+    expect(service.isSyncing()).toBeFalse();
+    expect(service.students().length).toBe(1);
+    expect(service.students()[0].name).toBe('遠端學員1');
+    expect(service.sessions()[0].title).toBe('遠端芭蕾課程');
+    expect(service.ticketPacks().length).toBe(1);
+  });
+
+  it('refreshFromBackend() 失敗時應捕獲異常並切換為離線狀態，不破壞本地現有數據', () => {
+    mockApi.getStudents.and.returnValue(throwError(() => new Error('連線拒絕')));
+
+    service.refreshFromBackend();
+
+    expect(service.isOnline()).toBeFalse();
+    expect(service.isSyncing()).toBeFalse();
+    expect(service.lastSyncError()).toContain('連線拒絕');
+  });
+
+  it('checkInWithSignature() 在本地樂觀更新後應非同步呼叫後端 API checkIn', () => {
+    // 先讓 state 擁有遠端學員與課程
+    service.refreshFromBackend();
+
+    const result = service.checkInWithSignature('stu-remote-1', 'data:image/png;base64,mock');
+    expect(result.success).toBeTrue();
+    expect(mockApi.checkIn).toHaveBeenCalledWith('session-remote-1', 'stu-remote-1', 'data:image/png;base64,mock');
+  });
+
+  it('requestLeave() 在本地計算 24h 後應非同步呼叫後端 API requestLeave', () => {
+    service.refreshFromBackend();
+    service.setSimulationHours(36);
+
+    const result = service.requestLeave('stu-remote-1', '個人事假');
+    expect(result.success).toBeTrue();
+    expect(result.isAdvance).toBeTrue();
+    expect(mockApi.requestLeave).toHaveBeenCalledWith('session-remote-1', 'stu-remote-1', '個人事假', 36);
+  });
+
+  it('cancelLeave() 應非同步呼叫後端 API cancelLeave', () => {
+    service.refreshFromBackend();
+    service.cancelLeave('stu-remote-1');
+    expect(mockApi.cancelLeave).toHaveBeenCalledWith('session-remote-1', 'stu-remote-1');
+  });
+
+  it('setStudentAttendanceStatus() 應非同步呼叫後端 API updateAttendanceStatus', () => {
+    service.refreshFromBackend();
+    service.setStudentAttendanceStatus('stu-remote-1', 'absent');
+    expect(mockApi.updateAttendanceStatus).toHaveBeenCalledWith(
+      'session-remote-1',
+      'stu-remote-1',
+      'absent',
+      '老師後台手動變更'
+    );
+  });
+
+  it('addTicketPack() 應非同步呼叫後端 API purchaseTicketPack', () => {
+    service.refreshFromBackend();
+    service.addTicketPack('stu-remote-1', '5_class', 5, 60);
+    expect(mockApi.purchaseTicketPack).toHaveBeenCalledWith(jasmine.objectContaining({
+      studentId: 'stu-remote-1',
+      type: '5_class',
+      totalCount: 5,
+      validityDays: 60
+    }));
+  });
+
+  it('extendPackExpiry() 應非同步呼叫後端 API extendTicketPack', () => {
+    service.refreshFromBackend();
+    service.extendPackExpiry('pack-remote-1', 30);
+    expect(mockApi.extendTicketPack).toHaveBeenCalledWith('pack-remote-1', 30);
+  });
+
+  it('cancelSessionDueToThreshold() 應非同步呼叫後端 API cancelSessionDueToThreshold', () => {
+    service.refreshFromBackend();
+    service.cancelSessionDueToThreshold('session-remote-1');
+    expect(mockApi.cancelSessionDueToThreshold).toHaveBeenCalledWith('session-remote-1');
+  });
+
+  it('resetMockData() 應呼叫後端 API resetSystem', () => {
+    service.resetMockData();
+    expect(mockApi.resetSystem).toHaveBeenCalled();
   });
 });
