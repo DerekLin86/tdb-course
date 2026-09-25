@@ -36,7 +36,7 @@ class TicketPack(Base):
 
     id = Column(String(), primary_key=True, index=True)
     student_id = Column(String(), foreign_key=ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True)
-    type = Column(String(), nullable=False)  # '5_class', '10_class', 'single'
+    type = Column(String(), nullable=False)  # '5_class', '10_class', 'single', 'trial'
     total_count = Column(Integer(), nullable=False)
     remaining_count = Column(Integer(), nullable=False, default=0)
     purchase_date = Column(String(), nullable=False)  # YYYY-MM-DD

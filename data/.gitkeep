@@ -1,0 +1,1 @@
+# Keep data directory for Docker bind mount (SQLite database storage)

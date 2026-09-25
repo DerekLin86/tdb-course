@@ -1,0 +1,13 @@
+node_modules
+dist
+.nx
+.angular
+.git
+.vscode
+.agents
+__pycache__
+*.pyc
+.pytest_cache
+.venv
+triple_d_ballet.db
+*.log

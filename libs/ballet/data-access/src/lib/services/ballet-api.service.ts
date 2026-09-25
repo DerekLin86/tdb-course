@@ -44,6 +44,16 @@ export class BalletApiService {
     return this.http.get<StudentWithActivePack>(`${this.baseUrl}/students/${studentId}`);
   }
 
+  updateStudent(studentId: string, payload: Partial<Student>): Observable<StudentWithActivePack> {
+    if (!this.http) return throwError(() => new Error('HttpClient not available'));
+    return this.http.put<StudentWithActivePack>(`${this.baseUrl}/students/${studentId}`, payload);
+  }
+
+  deleteStudent(studentId: string): Observable<{ message: string; success: boolean }> {
+    if (!this.http) return throwError(() => new Error('HttpClient not available'));
+    return this.http.delete<{ message: string; success: boolean }>(`${this.baseUrl}/students/${studentId}`);
+  }
+
   purchaseTicketPack(payload: TicketPackCreateRequest): Observable<TicketPack> {
     if (!this.http) return throwError(() => new Error('HttpClient not available'));
     return this.http.post<TicketPack>(`${this.baseUrl}/ticket-packs`, payload);

@@ -1,8 +1,7 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { BalletStateService } from '@libs/ballet/data-access';
+import { BalletStateService, Student } from '@libs/ballet/data-access';
 import { SignaturePadComponent } from '@libs/shared/ui';
-import { Student } from '@libs/ballet/data-access';
 
 @Component({
   selector: 'app-kiosk-checkin',
@@ -18,6 +17,19 @@ export class KioskCheckinComponent {
   readonly attendanceList = this.state.currentSessionAttendance;
   readonly financials = this.state.currentSessionFinancials;
 
+  // 可供簽到的課堂列表（排除已取消課堂，並依日期與開始時間升冪排序）
+  readonly availableSessions = computed(() => {
+    return this.state
+      .sessions()
+      .filter((s) => s.status !== 'cancelled')
+      .slice()
+      .sort((a, b) => {
+        const dateDiff = a.date.localeCompare(b.date);
+        if (dateDiff !== 0) return dateDiff;
+        return a.startTime.localeCompare(b.startTime);
+      });
+  });
+
   // 簽名彈窗控制 Signal
   readonly activeStudentForSigning = signal<{
     student: Student;
@@ -26,6 +38,16 @@ export class KioskCheckinComponent {
 
   // 簽到成功祝賀 Toast
   readonly toastMessage = signal<string | null>(null);
+
+  // 切換選取的課堂
+  onSessionChange(event: Event): void {
+    const select = event.target as HTMLSelectElement | null;
+    if (!select || !select.value) return;
+
+    // 若正開啟簽名視窗，切換課堂時重設，避免誤簽到舊課堂上下文
+    this.closeSignModal();
+    this.state.setSelectedSession(select.value);
+  }
 
   // 點擊學員卡片
   openSignModal(item: any): void {

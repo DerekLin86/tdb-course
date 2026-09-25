@@ -3,18 +3,33 @@
   <header class="hero-card">
     <h1 class="hero-title">Triple Dream<br>Ballet</h1>
     <p class="hero-tagline">Grace, Poise, Elegance.</p>
-    <p class="hero-subtitle">
-      {{ session().title }}
-    </p>
+    <div class="session-selector-container">
+      <label for="kiosk-session-select" class="sr-only">選擇課堂班次</label>
+      <div class="select-wrapper">
+        <select
+          id="kiosk-session-select"
+          class="session-select"
+          [value]="session().id"
+          (change)="onSessionChange($event)"
+        >
+          @for (s of availableSessions(); track s.id) {
+            <option [value]="s.id">
+              {{ s.date }} ({{ s.dayOfWeek }}) {{ s.startTime }}~{{ s.endTime }} - {{ s.title }}
+            </option>
+          }
+        </select>
+        <span class="select-arrow">▾</span>
+      </div>
+    </div>
 
     <div class="hero-meta-bar">
       <div class="meta-pill">
         <span class="meta-icon">📅</span>
-        <span>{{ session().date }} ({{ session().dayOfWeek }}) {{ session().startTime }} ~ {{ session().endTime }}</span>
+        <span>{{ session()?.date }} ({{ session()?.dayOfWeek }}) {{ session()?.startTime }} ~ {{ session()?.endTime }}</span>
       </div>
       <div class="meta-pill">
         <span class="meta-icon">📍</span>
-        <span>{{ session().venueName }}</span>
+        <span>{{ session()?.venueName }}</span>
       </div>
       <div class="meta-pill highlight">
         <span>實到 {{ financials().actualAttendedCount }} / 應到 {{ financials().expectedAttendees }} 人</span>

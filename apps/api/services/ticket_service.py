@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 import random
 import time
 from typing import Any, Dict, List, Optional
+from fastapi import HTTPException
 from database import Session, select, desc, asc
 from models.student import Student, TicketPack
 
@@ -16,6 +17,7 @@ class TicketService:
         "5_class": {"total_count": 5, "validity_days": 60, "price_paid": 2500},
         "10_class": {"total_count": 10, "validity_days": 100, "price_paid": 5000},
         "single": {"total_count": 1, "validity_days": 30, "price_paid": 500},
+        "trial": {"total_count": 1, "validity_days": 14, "price_paid": 400},
     }
 
     @staticmethod
@@ -28,6 +30,19 @@ class TicketService:
         price_paid: Optional[int] = None,
     ) -> TicketPack:
         """Purchases and activates a new ticket pack for a student."""
+        if pack_type == "trial":
+            existing_trial = db.execute(
+                select(TicketPack).where(
+                    TicketPack.student_id == student_id,
+                    TicketPack.type == "trial"
+                )
+            ).scalar_one_or_none()
+            if existing_trial:
+                raise HTTPException(
+                    status_code=400,
+                    detail="每位學員終身限購 1 次體驗課，無法重複購買！"
+                )
+
         config = TicketService.PACK_CONFIGS.get(
             pack_type, {"total_count": 5, "validity_days": 60, "price_paid": 2500}
         )

@@ -27,7 +27,7 @@
       <div class="section-title-row">
         <h2 class="section-title">我的上課票卡</h2>
         @if (pack(); as p) {
-          <span class="pack-badge">{{ p.totalCount }} 堂方案</span>
+          <span class="pack-badge">{{ p.type === 'trial' ? '單堂體驗課方案' : p.totalCount + ' 堂方案' }}</span>
         }
       </div>
 

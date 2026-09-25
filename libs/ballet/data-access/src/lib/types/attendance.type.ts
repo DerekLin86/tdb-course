@@ -21,6 +21,18 @@ export interface ClassSession {
   cancellationReason?: string;
 }
 
+export interface CreateClassSessionParams {
+  title: string;
+  date: string;       // YYYY-MM-DD
+  dayOfWeek?: string; // e.g. 週六 (未指定則自動根據日期計算)
+  startTime: string;  // 14:00
+  endTime: string;    // 15:30
+  venueName: string;  // e.g. 台北敦南教室 A 廳
+  venueCost?: number; // 場租成本，預設 2000
+  feePerStudent?: number; // 每堂學費折合，預設 500
+  maxCapacity?: number;   // 滿班人數，預設 10
+  minThreshold?: number;  // 損益防護門檻，預設 4
+}
 export interface AttendanceRecord {
   id: string;
   sessionId: string;
@@ -33,6 +45,11 @@ export interface AttendanceRecord {
   leaveRequestedAt?: string;  // 請假提出時間
   leaveReason?: string;
   remark?: string;
+}
+
+export interface StudentAttendanceHistoryItem {
+  record: AttendanceRecord;
+  session?: ClassSession;
 }
 
 export interface SessionFinancialStats {

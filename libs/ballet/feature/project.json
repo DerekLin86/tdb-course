@@ -3,5 +3,14 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/ballet/feature/src",
   "projectType": "library",
-  "tags": ["type:feature", "scope:ballet"]
+  "tags": ["type:feature", "scope:ballet"],
+  "targets": {
+    "test": {
+      "executor": "@angular-devkit/build-angular:karma",
+      "options": {
+        "polyfills": ["zone.js", "zone.js/testing"],
+        "tsConfig": "libs/ballet/feature/tsconfig.spec.json"
+      }
+    }
+  }
 }

@@ -563,6 +563,7 @@ class Engine:
         # File-based database: thread-local connection with WAL mode & busy timeout
         if not hasattr(self._local, "conn") or self._local.conn is None:
             check_same_thread = self.connect_args.get("check_same_thread", False)
+            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
             conn = sqlite3.connect(db_path, check_same_thread=check_same_thread, timeout=30.0)
             conn.row_factory = sqlite3.Row
             cur = conn.cursor()

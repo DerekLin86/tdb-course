@@ -124,3 +124,58 @@ def test_near_expiry_flag_boundary(client: TestClient, db_session: Session, seed
     target = next((s for s in resp.json() if s["id"] == seed_student.id), None)
     assert target is not None
     assert target["isNearExpiry"] is True
+
+
+def test_update_student(client: TestClient, seed_student: Student):
+    payload = {
+        "name": "陳秀琴 (進階班)",
+        "notes": "具備芭蕾足尖基礎",
+    }
+    resp = client.put(f"/api/v1/students/{seed_student.id}", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["name"] == "陳秀琴 (進階班)"
+    assert data["notes"] == "具備芭蕾足尖基礎"
+    assert data["phone"] == seed_student.phone
+
+
+def test_delete_student(client: TestClient, db_session: Session):
+    # 先建立一位獨立學員
+    new_student = Student(
+        id="stu-to-delete",
+        name="即將刪除學員",
+        phone="0999-000-111",
+        registered_at="2026-09-01",
+    )
+    db_session.add(new_student)
+    db_session.commit()
+
+    resp = client.delete(f"/api/v1/students/{new_student.id}")
+    assert resp.status_code == 200
+    assert resp.json()["success"] is True
+
+    # 再次查詢確認已不存在
+    get_resp = client.get(f"/api/v1/students/{new_student.id}")
+    assert get_resp.status_code == 404
+
+
+def test_purchase_trial_pack_and_limit(client: TestClient, seed_student: Student):
+    payload = {
+        "studentId": seed_student.id,
+        "type": "trial",
+        "totalCount": 1,
+        "validityDays": 14,
+        "pricePaid": 400,
+    }
+    # First purchase should succeed
+    resp = client.post("/api/v1/ticket-packs", json=payload)
+    assert resp.status_code in [200, 201]
+    data = resp.json()
+    assert data["type"] == "trial"
+    assert data["totalCount"] == 1
+    assert data["remainingCount"] == 1
+
+    # Second purchase should be rejected with 400
+    resp_repeat = client.post("/api/v1/ticket-packs", json=payload)
+    assert resp_repeat.status_code == 400
+    assert "每位學員終身限購 1 次體驗課，無法重複購買！" in resp_repeat.json()["detail"]

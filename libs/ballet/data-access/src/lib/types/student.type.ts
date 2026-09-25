@@ -1,4 +1,4 @@
-export type TicketPackType = '5_class' | '10_class' | 'single';
+export type TicketPackType = '5_class' | '10_class' | 'single' | 'trial';
 
 export interface TicketPack {
   id: string;
@@ -26,4 +26,17 @@ export interface StudentWithActivePack extends Student {
   activePack?: TicketPack;
   daysUntilExpiry?: number;
   isNearExpiry?: boolean; // <= 14 days
+}
+
+export interface CreateStudentParams {
+  name: string;
+  phone: string;
+  notes?: string;
+  initialPackType?: 'none' | '5_class' | '10_class' | 'trial';
+}
+
+export interface UpdateStudentParams {
+  name: string;
+  phone: string;
+  notes?: string;
 }

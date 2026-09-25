@@ -5,7 +5,7 @@ from typing import Literal, Optional, List
 from pydantic import Field
 from .base import CamelModel
 
-TicketPackType = Literal['5_class', '10_class', 'single']
+TicketPackType = Literal['5_class', '10_class', 'single', 'trial']
 TicketPackStatus = Literal['active', 'expired', 'depleted']
 
 

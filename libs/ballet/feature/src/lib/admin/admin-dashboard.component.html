@@ -9,12 +9,40 @@
       </p>
     </div>
 
-    <div class="session-status-tag">
-      @if (session().status === 'cancelled') {
-        <span class="tag-cancelled">本週已順延取消</span>
-      } @else {
-        <span class="tag-active">課堂進行中</span>
-      }
+    <div class="header-controls">
+      <!-- 課堂切換下拉選單 -->
+      <div class="session-selector-group">
+        <label for="sessionSelect" class="selector-label">課堂選單：</label>
+        <select
+          id="sessionSelect"
+          class="session-select"
+          [ngModel]="session()?.id"
+          (ngModelChange)="handleSelectSession($event)"
+        >
+          @for (s of allSessions(); track s.id) {
+            <option [value]="s.id">
+              {{ s.date }} ({{ s.dayOfWeek }}) · {{ s.title }} {{ s.status === 'cancelled' ? '【已順延】' : '' }}
+            </option>
+          }
+        </select>
+      </div>
+
+      <!-- 建立新課程按鈕 -->
+      <button
+        type="button"
+        class="btn-create-session"
+        (click)="openCreateModal()"
+      >
+        <span class="btn-icon">＋</span> 建立新課程
+      </button>
+
+      <div class="session-status-tag">
+        @if (session().status === 'cancelled') {
+          <span class="tag-cancelled">本週已順延取消</span>
+        } @else {
+          <span class="tag-active">課堂進行中</span>
+        }
+      </div>
     </div>
   </header>
 
@@ -127,14 +155,31 @@
     >
       全班票卡與儲值管理
     </button>
+    <button
+      type="button"
+      class="tab-btn"
+      [class.active]="activeTab() === 'students'"
+      (click)="activeTab.set('students')"
+    >
+      學員檔案與歷程
+    </button>
   </div>
 
   <!-- 分頁一：點名與簽名存根冊 -->
   @if (activeTab() === 'attendance') {
     <section class="admin-table-card">
       <div class="table-header-action">
-        <h2 class="table-card-title">課堂出席與簽名存根</h2>
-        <span class="table-tip">點擊學員簽名縮圖可放大調閱存根，防範出勤爭議</span>
+        <div class="title-with-desc">
+          <h2 class="table-card-title">課堂出席與簽名存根</h2>
+          <span class="table-tip">點擊學員簽名縮圖可放大調閱存根，防範出勤爭議</span>
+        </div>
+        <button
+          type="button"
+          class="btn-enroll-student"
+          (click)="openEnrollModal()"
+        >
+          <span class="btn-icon">+</span> 加入學員至本堂課
+        </button>
       </div>
 
       <div class="table-responsive">
@@ -151,6 +196,19 @@
             </tr>
           </thead>
           <tbody>
+            @if (attendanceList().length === 0) {
+              <tr>
+                <td colspan="7" class="empty-roster-cell">
+                  <div class="empty-roster-box">
+                    <p class="empty-roster-title">目前本堂課名冊尚無學員</p>
+                    <p class="empty-roster-desc">新建立課堂預設不預先匯入學員資料，請點擊上方按鈕手動加入學員名冊。</p>
+                    <button type="button" class="btn-enroll-inline" (click)="openEnrollModal()">
+                      + 立即手動加入學員
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
             @for (item of attendanceList(); track item.student.id) {
               <tr [class.row-attended]="item.status === 'attended'">
                 <td class="col-name">
@@ -212,6 +270,14 @@
                     <option value="leave_late">逾期請假 (扣堂)</option>
                     <option value="absent">缺席 (扣堂)</option>
                   </select>
+                  <button
+                    type="button"
+                    class="btn-remove-session"
+                    (click)="handleRemoveFromSession(item.student.id, item.student.name)"
+                    title="自本堂課名冊移出"
+                  >
+                    移出名冊
+                  </button>
                 </td>
               </tr>
             }
@@ -225,8 +291,17 @@
   @if (activeTab() === 'tickets') {
     <section class="admin-table-card">
       <div class="table-header-action">
-        <h2 class="table-card-title">學員票卡餘額與效期控管</h2>
-        <span class="table-tip">效期不足 14 天將顯示提醒，避免票券無限制展延</span>
+        <div>
+          <h2 class="table-card-title">學員名單與票卡效期控管</h2>
+          <span class="table-tip">支援新增、編輯與移除學員名單；效期不足 14 天將顯示提醒</span>
+        </div>
+        <button
+          type="button"
+          class="btn-add-student"
+          (click)="openAddStudentModal()"
+        >
+          <span class="btn-icon">＋</span> 新增學員
+        </button>
       </div>
 
       <div class="table-responsive">
@@ -239,7 +314,9 @@
               <th>剩餘 / 總堂數</th>
               <th>到期日期</th>
               <th>效期狀態</th>
-              <th>票卡操作</th>
+              <th>課堂備註</th>
+              <th>票卡儲值</th>
+              <th>名單操作</th>
             </tr>
           </thead>
           <tbody>
@@ -251,9 +328,13 @@
                 <td class="col-phone">{{ student.phone }}</td>
                 <td>
                   @if (student.activePack) {
-                    <span class="badge badge-pack">
-                      {{ student.activePack.totalCount }} 堂包
-                    </span>
+                    @if (student.activePack.type === 'trial') {
+                      <span class="badge badge-trial">體驗課 (1堂)</span>
+                    } @else {
+                      <span class="badge badge-pack">
+                        {{ student.activePack.totalCount }} 堂包
+                      </span>
+                    }
                   } @else {
                     <span class="text-muted">無有效卡</span>
                   }
@@ -285,7 +366,20 @@
                     -
                   }
                 </td>
+                <td class="col-notes">
+                  <span class="student-note">{{ student.notes || '-' }}</span>
+                </td>
                 <td class="col-buttons">
+                  <button
+                    type="button"
+                    class="btn-table-action btn-add-trial"
+                    [disabled]="state.hasPurchasedTrial(student.id)"
+                    [class.btn-disabled]="state.hasPurchasedTrial(student.id)"
+                    (click)="handleAddPack(student, 'trial')"
+                    [title]="state.hasPurchasedTrial(student.id) ? '每位學員終身限購 1 次' : '儲值單堂體驗課 ($400 / 14天)'"
+                  >
+                    {{ state.hasPurchasedTrial(student.id) ? '已購體驗課' : '＋ 體驗課 (1堂)' }}
+                  </button>
                   <button
                     type="button"
                     class="btn-table-action btn-add-5"
@@ -308,6 +402,24 @@
                     展延 30 天
                   </button>
                 </td>
+                <td class="col-manage">
+                  <button
+                    type="button"
+                    class="btn-table-action btn-edit"
+                    (click)="openEditStudentModal(student)"
+                    title="編輯學員資料"
+                  >
+                    編輯
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-table-action btn-delete"
+                    (click)="handleDeleteStudent(student)"
+                    title="從班級名單中移除"
+                  >
+                    移除
+                  </button>
+                </td>
               </tr>
             }
           </tbody>
@@ -315,6 +427,351 @@
       </div>
     </section>
   }
+
+  <!-- 分頁三：學員檔案與歷程 Master-Detail -->
+  @if (activeTab() === 'students') {
+    <div class="students-master-detail">
+      <!-- 左側 Master 側欄：學員清單與即時搜尋 -->
+      <aside class="students-sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-search-box">
+            <span class="search-icon">🔍</span>
+            <input
+              type="text"
+              class="search-input"
+              placeholder="搜尋學員姓名、電話或備註..."
+              [ngModel]="studentSearchKeyword()"
+              (ngModelChange)="studentSearchKeyword.set($event)"
+            />
+            @if (studentSearchKeyword()) {
+              <button
+                type="button"
+                class="search-clear-btn"
+                (click)="studentSearchKeyword.set('')"
+                title="清除搜尋"
+              >
+                ✕
+              </button>
+            }
+          </div>
+          <div class="sidebar-summary">
+            <span>共 {{ filteredStudentsForHistory().length }} 位學員</span>
+          </div>
+        </div>
+
+        <div class="students-list">
+          @for (stu of filteredStudentsForHistory(); track stu.id) {
+            <div
+              class="student-list-item"
+              [class.active]="selectedStudentForHistory()?.id === stu.id"
+              (click)="selectStudentForHistory(stu.id)"
+            >
+              <div class="student-item-avatar">
+                {{ stu.name.charAt(0) }}
+              </div>
+              <div class="student-item-info">
+                <div class="item-name-row">
+                  <span class="student-item-name">{{ stu.name }}</span>
+                  @if (stu.activePack) {
+                    <span class="student-item-pack-badge" [class.badge-low]="stu.activePack.remainingCount <= 2">
+                      剩 {{ stu.activePack.remainingCount }} 堂
+                    </span>
+                  } @else {
+                    <span class="student-item-pack-badge badge-empty">無有效票</span>
+                  }
+                </div>
+                <div class="item-sub-row">
+                  <span class="student-item-phone">{{ stu.phone }}</span>
+                </div>
+              </div>
+            </div>
+          } @empty {
+            <div class="empty-search-state">
+              <p>查無符合「{{ studentSearchKeyword() }}」的學員</p>
+            </div>
+          }
+        </div>
+      </aside>
+
+      <!-- 右側 Detail 面板：學員詳情、統計、票卡歷史與課堂出席時間軸 -->
+      <main class="student-detail-panel">
+        @if (selectedStudentForHistory(); as stu) {
+          <!-- 1. 學員基本檔案卡片 -->
+          <div class="detail-card student-profile-card">
+            <div class="profile-header-row">
+              <div class="profile-avatar-large">
+                {{ stu.name.charAt(0) }}
+              </div>
+              <div class="profile-meta">
+                <div class="profile-title-row">
+                  <h2 class="profile-name">{{ stu.name }}</h2>
+                  <span class="reg-date-tag">註冊於 {{ stu.registeredAt }}</span>
+                </div>
+                <div class="profile-contact-row">
+                  <span class="contact-item">📱 電話：<strong>{{ stu.phone }}</strong></span>
+                  @if (stu.lineUserId) {
+                    <span class="contact-item">💬 LINE 綁定：<strong>{{ stu.lineUserId }}</strong></span>
+                  }
+                </div>
+              </div>
+              <div class="profile-actions">
+                <button
+                  type="button"
+                  class="btn-profile-edit"
+                  (click)="openEditStudentModal(stu)"
+                >
+                  ✏️ 修改基本資料
+                </button>
+              </div>
+            </div>
+
+            <!-- 學員專屬備註（支援即時編輯保存） -->
+            <div class="student-notes-section">
+              <div class="notes-header">
+                <label for="detailStudentNotes" class="notes-label">
+                  📝 教師專屬學員備註（如身體狀況、舊傷、學習目標等）：
+                </label>
+                @if (notesSaveMessage()) {
+                  <span class="notes-saved-alert">{{ notesSaveMessage() }}</span>
+                }
+              </div>
+              <div class="notes-editor-row">
+                <textarea
+                  id="detailStudentNotes"
+                  class="notes-textarea"
+                  rows="2"
+                  placeholder="可在此記錄學員個人特質、柔軟度進度、開刀病史或特殊注意指示..."
+                  [ngModel]="editingDetailNotes()"
+                  (ngModelChange)="editingDetailNotes.set($event)"
+                ></textarea>
+                <button
+                  type="button"
+                  class="btn-save-notes"
+                  (click)="saveStudentNotes()"
+                >
+                  儲存備註
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. 學員出席與票卡指標統計列 -->
+          <div class="detail-stats-grid">
+            <div class="stat-mini-card">
+              <span class="stat-label">累積出席</span>
+              <span class="stat-val highlight-attended">{{ selectedStudentStats().totalAttended }} 堂</span>
+              <span class="stat-desc">完成手寫簽名簽到</span>
+            </div>
+            <div class="stat-mini-card">
+              <span class="stat-label">提前請假</span>
+              <span class="stat-val highlight-leave">{{ selectedStudentStats().totalAdvanceLeave }} 次</span>
+              <span class="stat-desc">24h前提出 (未扣堂)</span>
+            </div>
+            <div class="stat-mini-card">
+              <span class="stat-label">逾期未到</span>
+              <span class="stat-val highlight-late">{{ selectedStudentStats().totalLateLeave + selectedStudentStats().totalAbsent }} 次</span>
+              <span class="stat-desc">24h內請假或缺席扣堂</span>
+            </div>
+            <div class="stat-mini-card">
+              <span class="stat-label">當前剩餘</span>
+              <span class="stat-val highlight-remaining">{{ selectedStudentStats().remainingCount }} 堂</span>
+              <span class="stat-desc">
+                @if (selectedStudentStats().activePackExpiry) {
+                  效期至 {{ selectedStudentStats().activePackExpiry }}
+                } @else {
+                  尚無生效中票卡
+                }
+              </span>
+            </div>
+          </div>
+
+          <!-- 3. 票卡方案與購買歷程 (含快捷儲值) -->
+          <div class="detail-card packs-history-card">
+            <div class="card-section-header">
+              <div class="section-title-group">
+                <h3 class="section-title">票卡方案與儲值歷史</h3>
+                <span class="section-desc">包含當前有效與過往已完結之票卡歷程</span>
+              </div>
+              <div class="quick-recharge-group">
+                <button
+                  type="button"
+                  class="btn-quick-pack btn-quick-trial"
+                  [disabled]="state.hasPurchasedTrial(stu.id)"
+                  [class.btn-disabled]="state.hasPurchasedTrial(stu.id)"
+                  (click)="handleAddPack(stu, 'trial')"
+                  [title]="state.hasPurchasedTrial(stu.id) ? '每位學員終身限購 1 次' : '儲值單堂體驗課 ($400 / 14天)'"
+                >
+                  {{ state.hasPurchasedTrial(stu.id) ? '已購體驗課' : '＋ 體驗課' }}
+                </button>
+                <button
+                  type="button"
+                  class="btn-quick-pack btn-quick-5"
+                  (click)="handleAddPack(stu, '5_class')"
+                >
+                  ＋ 5 堂卡
+                </button>
+                <button
+                  type="button"
+                  class="btn-quick-pack btn-quick-10"
+                  (click)="handleAddPack(stu, '10_class')"
+                >
+                  ＋ 10 堂卡
+                </button>
+                @if (stu.activePack) {
+                  <button
+                    type="button"
+                    class="btn-quick-pack btn-quick-extend"
+                    (click)="handleExtendExpiry(stu)"
+                  >
+                    展延 30 天
+                  </button>
+                }
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="packs-table">
+                <thead>
+                  <tr>
+                    <th>方案名稱</th>
+                    <th>總堂數</th>
+                    <th>剩餘堂數</th>
+                    <th>購買日期</th>
+                    <th>到期日</th>
+                    <th>實付金額</th>
+                    <th>票卡狀態</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (pack of selectedStudentPacksHistory(); track pack.id) {
+                    <tr>
+                      <td class="col-pack-type">
+                        <span class="pack-type-tag" [class]="'tag-' + pack.type">
+                          {{ pack.type === 'trial' ? '單堂體驗課方案' : (pack.totalCount + ' 堂常規方案') }}
+                        </span>
+                      </td>
+                      <td>{{ pack.totalCount }} 堂</td>
+                      <td class="fw-bold">{{ pack.remainingCount }} 堂</td>
+                      <td>{{ pack.purchaseDate }}</td>
+                      <td>{{ pack.expiryDate }}</td>
+                      <td>NT$ {{ pack.pricePaid ?? '-' }}</td>
+                      <td>
+                        @if (pack.status === 'active') {
+                          <span class="status-pill status-active">使用中</span>
+                        } @else if (pack.status === 'depleted') {
+                          <span class="status-pill status-depleted">已用畢</span>
+                        } @else {
+                          <span class="status-pill status-expired">已逾期</span>
+                        }
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="7" class="empty-table-cell">尚無票卡購買記錄</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 4. 課堂出席歷程時間軸 -->
+          <div class="detail-card attendance-history-card">
+            <div class="card-section-header">
+              <div class="section-title-group">
+                <h3 class="section-title">課堂出席歷程與簽名存根時間軸</h3>
+                <span class="section-desc">依課堂開課日期降冪排列，點擊簽名縮圖可調閱現場憑證</span>
+              </div>
+            </div>
+
+            <div class="attendance-timeline">
+              @for (item of selectedStudentAttendanceHistory(); track item.record.id) {
+                <div class="timeline-entry" [class]="'status-' + item.record.status">
+                  <div class="timeline-marker">
+                    <span class="marker-dot"></span>
+                    <span class="marker-line"></span>
+                  </div>
+
+                  <div class="timeline-content">
+                    <div class="timeline-header">
+                      <div class="session-info">
+                        <h4 class="session-title">{{ item.session?.title || '成人芭蕾課堂' }}</h4>
+                        <div class="session-meta">
+                          <span class="meta-date">📅 {{ item.session?.date }} ({{ item.session?.dayOfWeek }})</span>
+                          <span class="meta-time">⏰ {{ item.session?.startTime }}~{{ item.session?.endTime }}</span>
+                          <span class="meta-venue">📍 {{ item.session?.venueName }}</span>
+                        </div>
+                      </div>
+
+                      <div class="attendance-badge-group">
+                        @switch (item.record.status) {
+                          @case ('attended') {
+                            <span class="badge badge-attended">✅ 實到出席 (扣 1 堂)</span>
+                          }
+                          @case ('leave_advance') {
+                            <span class="badge badge-advance-leave">🗓 提前請假 (不扣堂)</span>
+                          }
+                          @case ('leave_late') {
+                            <span class="badge badge-late-leave">⚠️ 逾期請假 (扣 1 堂)</span>
+                          }
+                          @case ('absent') {
+                            <span class="badge badge-absent">❌ 缺席未到 (扣 1 堂)</span>
+                          }
+                          @default {
+                            <span class="badge badge-registered">預約預排中</span>
+                          }
+                        }
+                      </div>
+                    </div>
+
+                    <div class="timeline-body">
+                      <!-- 簽名縮圖區 -->
+                      @if (item.record.signatureDataUrl) {
+                        <div class="sig-preview-row">
+                          <span class="sig-label">iPad 現場簽名憑證：</span>
+                          <div
+                            class="sig-thumb-box"
+                            (click)="openSignatureModal(stu.name, item.record.signedAt || item.session?.date || '', item.record.signatureDataUrl)"
+                            title="點擊放大調閱手寫簽名"
+                          >
+                            <img [src]="item.record.signatureDataUrl" alt="學員出席簽名" class="sig-thumb-img" />
+                            <span class="thumb-hint">🔍 點擊放大</span>
+                          </div>
+                          @if (item.record.signedAt) {
+                            <span class="signed-time">簽到時間：{{ item.record.signedAt }}</span>
+                          }
+                        </div>
+                      }
+
+                      <!-- 請假理由或備註 -->
+                      @if (item.record.leaveReason) {
+                        <div class="leave-reason-box">
+                          <span class="leave-reason-label">請假事由：</span>
+                          <span class="leave-reason-text">{{ item.record.leaveReason }}</span>
+                          @if (item.record.leaveRequestedAt) {
+                            <span class="leave-request-time">（提出於 {{ item.record.leaveRequestedAt }}）</span>
+                          }
+                        </div>
+                      }
+                    </div>
+                  </div>
+                </div>
+              } @empty {
+                <div class="empty-timeline-state">
+                  <p>該學員目前尚無課堂出席或出勤預約記錄</p>
+                </div>
+              }
+            </div>
+          </div>
+        } @else {
+          <div class="empty-student-selection">
+            <p>請自左側清單選擇欲調閱之學員</p>
+          </div>
+        }
+      </main>
+    </div>
+  }
+
 
   <!-- 手寫簽名存根放大彈窗 -->
   @if (viewingSignature(); as sig) {
@@ -345,6 +802,452 @@
             關閉檢視
           </button>
         </footer>
+      </div>
+    </div>
+  }
+
+  <!-- 建立新課程彈窗 Modal -->
+  @if (showCreateModal()) {
+    <div class="modal-backdrop" (click)="closeCreateModal()">
+      <div class="session-form-card" (click)="$event.stopPropagation()">
+        <header class="form-card-header">
+          <div>
+            <span class="modal-prefix">NEW SCHEDULE · 排定班次</span>
+            <h3>建立新課堂班次</h3>
+            <p>排定新的成人芭蕾課堂並設定開班門檻與場租損益參數</p>
+          </div>
+          <button type="button" class="close-btn" (click)="closeCreateModal()">✕</button>
+        </header>
+
+        <div class="form-card-body">
+          @if (createFormError()) {
+            <div class="form-error-alert">
+              {{ createFormError() }}
+            </div>
+          }
+
+          <div class="form-section">
+            <h4 class="form-section-title">課堂基本資料</h4>
+
+            <div class="form-group">
+              <label for="newSessionTitle" class="form-label">課程名稱 <span class="required">*</span></label>
+              <input
+                id="newSessionTitle"
+                type="text"
+                class="form-input"
+                placeholder="例如：成人優雅芭蕾美姿體雕班"
+                [ngModel]="newSessionTitle()"
+                (ngModelChange)="newSessionTitle.set($event)"
+              />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="newSessionDate" class="form-label">開課日期 <span class="required">*</span></label>
+                <input
+                  id="newSessionDate"
+                  type="date"
+                  class="form-input"
+                  [ngModel]="newSessionDate()"
+                  (ngModelChange)="newSessionDate.set($event)"
+                />
+              </div>
+
+              <div class="form-group flex-1">
+                <label class="form-label">星期（自動換算）</label>
+                <div class="form-readonly-badge">
+                  {{ newSessionDayOfWeek() || '請先選擇日期' }}
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="newSessionStart" class="form-label">開始時間 <span class="required">*</span></label>
+                <input
+                  id="newSessionStart"
+                  type="time"
+                  class="form-input"
+                  [ngModel]="newSessionStartTime()"
+                  (ngModelChange)="newSessionStartTime.set($event)"
+                />
+              </div>
+              <div class="form-group flex-1">
+                <label for="newSessionEnd" class="form-label">結束時間 <span class="required">*</span></label>
+                <input
+                  id="newSessionEnd"
+                  type="time"
+                  class="form-input"
+                  [ngModel]="newSessionEndTime()"
+                  (ngModelChange)="newSessionEndTime.set($event)"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="newSessionVenue" class="form-label">上課教室地點 <span class="required">*</span></label>
+              <input
+                id="newSessionVenue"
+                type="text"
+                class="form-input"
+                placeholder="例如：敦南日光舞蹈排練室 A 廳"
+                [ngModel]="newSessionVenue()"
+                (ngModelChange)="newSessionVenue.set($event)"
+              />
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4 class="form-section-title">場租損益與開班門檻</h4>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="newSessionCost" class="form-label">固定場租成本 (NT$) <span class="required">*</span></label>
+                <input
+                  id="newSessionCost"
+                  type="number"
+                  class="form-input"
+                  min="0"
+                  step="100"
+                  [ngModel]="newSessionVenueCost()"
+                  (ngModelChange)="newSessionVenueCost.set($event)"
+                />
+              </div>
+              <div class="form-group flex-1">
+                <label for="newSessionFee" class="form-label">每人每堂折合 (NT$) <span class="required">*</span></label>
+                <input
+                  id="newSessionFee"
+                  type="number"
+                  class="form-input"
+                  min="0"
+                  step="50"
+                  [ngModel]="newSessionFeePerStudent()"
+                  (ngModelChange)="newSessionFeePerStudent.set($event)"
+                />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="newSessionCap" class="form-label">班級滿額人數 <span class="required">*</span></label>
+                <input
+                  id="newSessionCap"
+                  type="number"
+                  class="form-input"
+                  min="1"
+                  max="50"
+                  [ngModel]="newSessionMaxCapacity()"
+                  (ngModelChange)="newSessionMaxCapacity.set($event)"
+                />
+              </div>
+              <div class="form-group flex-1">
+                <label for="newSessionThreshold" class="form-label">開班防虧損門檻 (人) <span class="required">*</span></label>
+                <input
+                  id="newSessionThreshold"
+                  type="number"
+                  class="form-input"
+                  min="1"
+                  max="50"
+                  [ngModel]="newSessionMinThreshold()"
+                  (ngModelChange)="newSessionMinThreshold.set($event)"
+                />
+              </div>
+            </div>
+            <p class="form-tip">
+              防虧損機制：開課前出席人數若少於 {{ newSessionMinThreshold() }} 人，系統將觸發虧損警示，並支援老師一鍵順延停課以保護場租不倒貼。
+            </p>
+          </div>
+        </div>
+
+        <footer class="form-card-footer">
+          <button type="button" class="btn-cancel" (click)="closeCreateModal()">取消</button>
+          <button type="button" class="btn-submit" (click)="submitCreateSession()">確認建立課堂</button>
+        </footer>
+      </div>
+    </div>
+  }
+
+  <!-- 新增學員彈窗 Modal -->
+  @if (showAddStudentModal()) {
+    <div class="modal-backdrop" (click)="closeAddStudentModal()">
+      <div class="session-form-card" (click)="$event.stopPropagation()">
+        <header class="form-card-header">
+          <div>
+            <span class="modal-prefix">NEW STUDENT · 學員入班</span>
+            <h3>新增學員名單</h3>
+            <p>建立新學員資料並可選擇性開立初始票卡</p>
+          </div>
+          <button type="button" class="close-btn" (click)="closeAddStudentModal()">✕</button>
+        </header>
+
+        <div class="form-card-body">
+          @if (addStudentError()) {
+            <div class="form-error-alert">
+              {{ addStudentError() }}
+            </div>
+          }
+
+          <div class="form-section">
+            <h4 class="form-section-title">基本資料</h4>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="newStudentName" class="form-label">學員姓名 <span class="required">*</span></label>
+                <input
+                  id="newStudentName"
+                  type="text"
+                  class="form-input"
+                  placeholder="例如：李雅芬"
+                  [ngModel]="newStudentName()"
+                  (ngModelChange)="newStudentName.set($event)"
+                />
+              </div>
+
+              <div class="form-group flex-1">
+                <label for="newStudentPhone" class="form-label">聯絡電話 <span class="required">*</span></label>
+                <input
+                  id="newStudentPhone"
+                  type="tel"
+                  class="form-input"
+                  placeholder="例如：0912-888-999"
+                  [ngModel]="newStudentPhone()"
+                  (ngModelChange)="newStudentPhone.set($event)"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="newStudentNotes" class="form-label">備註與課堂注意（選填）</label>
+              <textarea
+                id="newStudentNotes"
+                class="form-textarea"
+                rows="2"
+                placeholder="例如：瑜珈底子、膝關節微緊、每週固定週六上課"
+                [ngModel]="newStudentNotes()"
+                (ngModelChange)="newStudentNotes.set($event)"
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4 class="form-section-title">初始票卡設定</h4>
+
+            <div class="form-group">
+              <label for="newStudentPack" class="form-label">初始方案開卡</label>
+              <select
+                id="newStudentPack"
+                class="form-input"
+                [ngModel]="newStudentPackType()"
+                (ngModelChange)="newStudentPackType.set($event)"
+              >
+                <option value="none">暫不儲值（僅建立名冊）</option>
+                <option value="trial">單堂體驗課優惠方案（1 堂 / 14 天 / NT$ 400）</option>
+                <option value="5_class">＋ 5 堂課票卡（效期 60 天 / NT$ 2,500）</option>
+                <option value="10_class">＋ 10 堂課票卡（效期 100 天 / NT$ 5,000）</option>
+              </select>
+            </div>
+            <p class="form-tip">
+              入班開卡後，系統將自動將該學員納入當前所有排定課堂之預約待簽到名冊中。
+            </p>
+          </div>
+        </div>
+
+        <footer class="form-card-footer">
+          <button type="button" class="btn-cancel" (click)="closeAddStudentModal()">取消</button>
+          <button type="button" class="btn-submit" (click)="submitAddStudent()">確認新增學員</button>
+        </footer>
+      </div>
+    </div>
+  }
+
+  <!-- 編輯學員彈窗 Modal -->
+  @if (showEditStudentModal()) {
+    <div class="modal-backdrop" (click)="closeEditStudentModal()">
+      <div class="session-form-card" (click)="$event.stopPropagation()">
+        <header class="form-card-header">
+          <div>
+            <span class="modal-prefix">EDIT PROFILE · 資料修改</span>
+            <h3>編輯學員資料</h3>
+            <p>修改學員姓名、聯絡電話與課堂身體狀況備註</p>
+          </div>
+          <button type="button" class="close-btn" (click)="closeEditStudentModal()">✕</button>
+        </header>
+
+        <div class="form-card-body">
+          @if (editStudentError()) {
+            <div class="form-error-alert">
+              {{ editStudentError() }}
+            </div>
+          }
+
+          <div class="form-section">
+            <h4 class="form-section-title">學員基本資料</h4>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="editStudentName" class="form-label">學員姓名 <span class="required">*</span></label>
+                <input
+                  id="editStudentName"
+                  type="text"
+                  class="form-input"
+                  [ngModel]="editStudentName()"
+                  (ngModelChange)="editStudentName.set($event)"
+                />
+              </div>
+
+              <div class="form-group flex-1">
+                <label for="editStudentPhone" class="form-label">聯絡電話 <span class="required">*</span></label>
+                <input
+                  id="editStudentPhone"
+                  type="tel"
+                  class="form-input"
+                  [ngModel]="editStudentPhone()"
+                  (ngModelChange)="editStudentPhone.set($event)"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="editStudentNotes" class="form-label">備註與課堂注意（選填）</label>
+              <textarea
+                id="editStudentNotes"
+                class="form-textarea"
+                rows="3"
+                placeholder="例如：腰部舊傷、核心肌力良好"
+                [ngModel]="editStudentNotes()"
+                (ngModelChange)="editStudentNotes.set($event)"
+              ></textarea>
+            </div>
+          </div>
+        </div>
+
+        <footer class="form-card-footer">
+          <button type="button" class="btn-cancel" (click)="closeEditStudentModal()">取消</button>
+          <button type="button" class="btn-submit" (click)="submitEditStudent()">儲存修改</button>
+        </footer>
+      </div>
+    </div>
+  }
+
+  <!-- 手動加入學員至課堂彈窗 -->
+  @if (showEnrollModal()) {
+    <div class="modal-backdrop" (click)="closeEnrollModal()">
+      <div class="modal-card modal-enroll" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>加入學員至本堂課</h3>
+          <button type="button" class="btn-close" (click)="closeEnrollModal()">✕</button>
+        </div>
+
+        <div class="modal-segmented-nav">
+          <button
+            type="button"
+            class="seg-btn"
+            [class.active]="enrollMode() === 'existing'"
+            (click)="enrollMode.set('existing')"
+          >
+            選擇現有學員
+          </button>
+          <button
+            type="button"
+            class="seg-btn"
+            [class.active]="enrollMode() === 'new'"
+            (click)="enrollMode.set('new')"
+          >
+            + 建立新學員並加入
+          </button>
+        </div>
+
+        <div class="modal-body">
+          @if (enrollError()) {
+            <div class="alert-error">{{ enrollError() }}</div>
+          }
+
+          <p class="modal-desc">
+            當前課堂：<strong>{{ session().title }}</strong>（{{ session().date }} {{ session().dayOfWeek }}）
+          </p>
+
+          @if (enrollMode() === 'existing') {
+            @if (availableStudentsToEnroll().length === 0) {
+              <div class="empty-available-box">
+                <p>全班所有學員皆已在此堂課名冊中！</p>
+                <span class="sub-hint">若需新增未建檔學員，請切換至「+ 建立新學員並加入」標籤。</span>
+              </div>
+            } @else {
+              <div class="form-group">
+                <label>選擇學員</label>
+                <select
+                  class="form-control"
+                  [ngModel]="selectedStudentToEnroll()"
+                  (ngModelChange)="selectedStudentToEnroll.set($event)"
+                >
+                  @for (s of availableStudentsToEnroll(); track s.id) {
+                    <option [value]="s.id">
+                      {{ s.name }} (剩餘: {{ s.activePack?.remainingCount ?? 0 }} 堂 / {{ s.phone }})
+                    </option>
+                  }
+                </select>
+              </div>
+            }
+          } @else {
+            <div class="form-group">
+              <label>學員姓名 <span class="required">*</span></label>
+              <input
+                type="text"
+                class="form-control"
+                placeholder="請輸入姓名（例如：林小美）"
+                [ngModel]="newQuickStudentName()"
+                (ngModelChange)="newQuickStudentName.set($event)"
+              />
+            </div>
+
+            <div class="form-group">
+              <label>聯絡電話 <span class="required">*</span></label>
+              <input
+                type="tel"
+                class="form-control"
+                placeholder="09xx-xxx-xxx"
+                [ngModel]="newQuickStudentPhone()"
+                (ngModelChange)="newQuickStudentPhone.set($event)"
+              />
+            </div>
+
+            <div class="form-group">
+              <label>初始票卡方案</label>
+              <select
+                class="form-control"
+                [ngModel]="newQuickStudentPackType()"
+                (ngModelChange)="newQuickStudentPackType.set($event)"
+              >
+                <option value="trial">單堂體驗課優惠方案（1 堂 / 14 天 / NT$ 400）</option>
+                <option value="10_class">10 堂票卡方案 ($5,000 / 效期 100 天)</option>
+                <option value="5_class">5 堂票卡方案 ($2,500 / 效期 60 天)</option>
+                <option value="none">暫不購買票卡 (0 堂)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>身體狀況備註</label>
+              <input
+                type="text"
+                class="form-control"
+                placeholder="例：膝蓋舊傷、初學入門"
+                [ngModel]="newQuickStudentNotes()"
+                (ngModelChange)="newQuickStudentNotes.set($event)"
+              />
+            </div>
+          }
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-cancel" (click)="closeEnrollModal()">取消</button>
+          @if (enrollMode() === 'existing') {
+            @if (availableStudentsToEnroll().length > 0) {
+              <button type="button" class="btn-primary" (click)="submitEnrollStudent()">確認加入</button>
+            }
+          } @else {
+            <button type="button" class="btn-primary" (click)="submitQuickCreateAndEnroll()">建立並加入本課</button>
+          }
+        </div>
       </div>
     </div>
   }

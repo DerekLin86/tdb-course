@@ -4,10 +4,12 @@
   "scripts": {
     "ng": "nx",
     "start": "nx serve triple-d-ballet-class",
-    "build": "nx build triple-d-ballet-class",
-    "watch": "nx build triple-d-ballet-class --watch --configuration development",
-    "test": "nx run-many -t test",
-    "test:ci": "nx run-many -t test --watch=false --browsers=ChromeHeadless",
+    "build": "NX_ISOLATE_PLUGINS=false nx build triple-d-ballet-class",
+    "watch": "NX_ISOLATE_PLUGINS=false nx build triple-d-ballet-class --watch --configuration development",
+    "test": "NX_ISOLATE_PLUGINS=false nx run-many -t test",
+    "test:ci": "NX_ISOLATE_PLUGINS=false nx run-many -t test --watch=false --browsers=ChromeHeadless --parallel=3",
+    "test:affected": "NX_ISOLATE_PLUGINS=false nx affected -t test --watch=false --browsers=ChromeHeadless",
+    "validate:quick": "npm run build && npm run test:affected",
     "validate:pr": "npm run build && npm run test:ci"
   },
   "private": true,
