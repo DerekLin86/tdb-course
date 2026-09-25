@@ -1,0 +1,16 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy dependency manifests
+COPY package*.json ./
+
+# Install dependencies inside Linux container
+RUN npm ci
+
+# Source code is mounted at runtime via docker-compose volume
+# Expose Angular dev server default port
+EXPOSE 4200
+
+# Run Angular application via Nx with host binding and polling for docker container compatibility
+CMD ["npx", "nx", "serve", "triple-d-ballet-class", "--host", "0.0.0.0", "--disable-host-check", "--poll", "2000"]

@@ -10,7 +10,11 @@
     "test:ci": "NX_ISOLATE_PLUGINS=false nx run-many -t test --watch=false --browsers=ChromeHeadless --parallel=3",
     "test:affected": "NX_ISOLATE_PLUGINS=false nx affected -t test --watch=false --browsers=ChromeHeadless",
     "validate:quick": "npm run build && npm run test:affected",
-    "validate:pr": "npm run build && npm run test:ci"
+    "validate:pr": "npm run build && npm run test:ci",
+    "docker:dev": "docker compose -f docker-compose.dev.yml up --build",
+    "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
+    "docker:prod:build": "docker compose up -d --build",
+    "docker:prod:down": "docker compose down"
   },
   "private": true,
   "dependencies": {

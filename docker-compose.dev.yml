@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: tdb-backend-dev
+    restart: unless-stopped
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    environment:
+      - DATABASE_URL=sqlite:////app/data/triple_d_ballet.db
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # 掛載後端代碼實現熱重載 (Hot Reload)
+      - ./apps/api:/app
+      # 持久化資料庫路徑
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    networks:
+      - tdb-net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend.dev
+    container_name: tdb-frontend-dev
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+    volumes:
+      # 掛載前端專案根目錄實現熱重載
+      - .:/app
+      # 匿名 volume 隔離容器內 Linux node_modules 與主機端的 node_modules
+      - /app/node_modules
+    ports:
+      - "4200:4200"
+    depends_on:
+      - backend
+    networks:
+      - tdb-net
+
+networks:
+  tdb-net:
+    driver: bridge
