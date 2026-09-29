@@ -22,7 +22,7 @@ services:
     restart: unless-stopped
     ports:
       # 外部訪問端口：可依 Synology NAS 習慣修改為其他 port，如 8088:80
-      - "${FRONTEND_PORT:-8080}:80"
+      - "8080:80"
     depends_on:
       - backend
     networks:
