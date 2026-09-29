@@ -135,6 +135,16 @@
   display: flex;
   flex-direction: column;
   gap: 1.75rem;
+
+  @media (min-width: 768px) and (max-width: 1024px) {
+    padding: 1.25rem 1.5rem 3rem;
+    gap: 1.5rem;
+  }
+
+  @media (max-width: 767px) {
+    padding: 0.75rem 1rem 2.5rem;
+    gap: 1.25rem;
+  }
 }
 
 .admin-header,
@@ -241,6 +251,43 @@
     background: #fdf2f2;
     color: #b91c1c;
   }
+
+  @media (min-width: 768px) and (max-width: 1024px) {
+    padding: 1.5rem 1.75rem;
+  }
+
+  @media (max-width: 767px) {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1.25rem 1rem;
+    gap: 1rem;
+
+    .page-title {
+      font-size: 1.45rem;
+    }
+
+    .header-controls {
+      width: 100%;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.75rem;
+    }
+
+    .session-selector-group {
+      width: 100%;
+      justify-content: space-between;
+
+      .session-select {
+        flex: 1;
+      }
+    }
+
+    .btn-create-session {
+      width: 100%;
+      justify-content: center;
+      min-height: 44px;
+    }
+  }
 }
 
 // --- 核心區一：開班門檻與場租損益防護看板 ---
@@ -313,6 +360,11 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
+
+    @media (min-width: 768px) and (max-width: 1024px) {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
   }
 
   .kpi-box {
@@ -408,6 +460,30 @@
       }
     }
   }
+
+  @media (max-width: 767px) {
+    padding: 1.25rem 1rem;
+
+    .guard-title {
+      font-size: 1.25rem;
+    }
+
+    .kpi-grid {
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .risk-action-bar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.75rem;
+
+      .btn-defer-session {
+        width: 100%;
+        min-height: 44px;
+      }
+    }
+  }
 }
 
 // --- 標籤頁切換 ---
@@ -434,6 +510,23 @@
       background: #8e5b69;
       color: #ffffff;
       box-shadow: 0 4px 12px rgba(142, 91, 105, 0.25);
+    }
+  }
+
+  @media (max-width: 767px) {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.35rem;
+    width: 100%;
+
+    .tab-btn {
+      white-space: nowrap;
+      flex-shrink: 0;
+      min-height: 44px;
+      font-size: 0.88rem;
+      padding: 0.6rem 1rem;
     }
   }
 }
@@ -482,10 +575,28 @@
       line-height: 1;
     }
   }
+
+  @media (max-width: 767px) {
+    padding: 1.25rem 1rem;
+
+    .table-header-action {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .btn-enroll-student,
+    .btn-add-student {
+      width: 100%;
+      justify-content: center;
+      min-height: 44px;
+    }
+  }
 }
 
 .table-responsive {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .data-table {
@@ -1178,6 +1289,12 @@
     position: static;
   }
 
+  @media (max-width: 767px) {
+    width: 100%;
+    max-height: 300px;
+    padding: 1rem 0.75rem;
+  }
+
   .sidebar-header {
     display: flex;
     flex-direction: column;
@@ -1374,6 +1491,11 @@
   flex-direction: column;
   gap: 1.5rem;
 
+  @media (max-width: 767px) {
+    width: 100%;
+    gap: 1rem;
+  }
+
   .detail-card {
     background: #ffffff;
     border-radius: 20px;
@@ -1413,6 +1535,18 @@
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
+
+    @media (max-width: 767px) {
+      flex-wrap: wrap;
+      width: 100%;
+      gap: 0.4rem;
+
+      button {
+        flex: 1;
+        min-width: 90px;
+        min-height: 40px;
+      }
+    }
 
     .btn-quick-pack {
       padding: 0.45rem 0.85rem;
@@ -1485,6 +1619,10 @@
 
 // 1. 基本檔案卡片
 .student-profile-card {
+  @media (max-width: 767px) {
+    padding: 1.25rem 1rem;
+  }
+
   .profile-header-row {
     display: flex;
     align-items: center;
@@ -1492,9 +1630,10 @@
     padding-bottom: 1.25rem;
     border-bottom: 1px solid #f1f5f9;
 
-    @media (max-width: 600px) {
+    @media (max-width: 767px) {
       flex-direction: column;
       align-items: flex-start;
+      gap: 0.75rem;
     }
   }
 
@@ -1657,8 +1796,9 @@
   grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
 
-  @media (max-width: 768px) {
+  @media (max-width: 767px) {
     grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
   }
 
   .stat-mini-card {
