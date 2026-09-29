@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   backend:
-    image: ghcr.io/${IMAGE_REPO:-derek-lin/triple-d-ballet-class}/tdb-backend:${IMAGE_TAG:-latest}
+    image: ghcr.io/${IMAGE_REPO:-dereklin86/tdb-course}/tdb-backend:${IMAGE_TAG:-latest}
     container_name: tdb-backend
     restart: unless-stopped
     environment:
@@ -17,7 +17,7 @@ services:
       - tdb-net
 
   frontend:
-    image: ghcr.io/${IMAGE_REPO:-derek-lin/triple-d-ballet-class}/tdb-frontend:${IMAGE_TAG:-latest}
+    image: ghcr.io/${IMAGE_REPO:-dereklin86/tdb-course}/tdb-frontend:${IMAGE_TAG:-latest}
     container_name: tdb-frontend
     restart: unless-stopped
     ports:
