@@ -337,6 +337,83 @@ describe('BalletStateService (防虧損與出缺勤業務邏輯測試 - 單機�
 
       expect(service.hasPurchasedTrial(testStuId)).toBeTrue();
     });
+
+    it('【學員歷程查詢】：getStudentAttendanceHistory 應正確關聯課堂資訊並依時間降冪排列', () => {
+      const studentId = 'stu-1';
+      // 預設 mock 資料中 stu-1 有出席記錄
+      const history = service.getStudentAttendanceHistory(studentId);
+
+      expect(history).toBeTruthy();
+      expect(history.length).toBeGreaterThanOrEqual(1);
+
+      // 檢查每筆記錄皆屬於該學員
+      for (const item of history) {
+        expect(item.record.studentId).toBe(studentId);
+        if (item.session) {
+          expect(item.session.id).toBe(item.record.sessionId);
+        }
+      }
+
+      // 新增跨日期的課堂與出席記錄測試降冪排序
+      service.sessions.set([
+        ...service.sessions(),
+        {
+          id: 'session-future-1',
+          date: '2026-10-15',
+          dayOfWeek: '週四',
+          startTime: '19:00',
+          endTime: '20:30',
+          title: '芭蕾進階班',
+          venueName: '敦南 B 廳',
+          venueCost: 2000,
+          feePerStudent: 500,
+          maxCapacity: 10,
+          minThreshold: 4,
+          status: 'scheduled'
+        }
+      ]);
+      service.attendance.set([
+        ...service.attendance(),
+        {
+          id: 'att-future-1',
+          sessionId: 'session-future-1',
+          studentId: studentId,
+          studentName: '陳秀琴',
+          status: 'registered',
+          deductedCount: 0
+        }
+      ]);
+
+      const updatedHistory = service.getStudentAttendanceHistory(studentId);
+      expect(updatedHistory[0].session?.id).toBe('session-future-1');
+    });
+
+    it('【學員票卡歷程】：getStudentTicketPacks 應回傳該學員所有票卡並依購買日期降冪排列', () => {
+      const studentId = 'stu-2';
+      // 先新增一張歷史票卡
+      service.addTicketPack(studentId, '5_class', 5, 60);
+
+      const packs = service.getStudentTicketPacks(studentId);
+      expect(packs.length).toBeGreaterThanOrEqual(2);
+
+      for (const p of packs) {
+        expect(p.studentId).toBe(studentId);
+      }
+
+      for (let i = 0; i < packs.length - 1; i++) {
+        expect(packs[i].purchaseDate.localeCompare(packs[i + 1].purchaseDate)).toBeGreaterThanOrEqual(0);
+      }
+    });
+
+    it('【學員備註更新】：updateStudentNotes 應正確更新學員備註並持久化', () => {
+      const studentId = 'stu-1';
+      const newNotes = '曾有左膝十字韌帶舊傷，做 Grand Plié 時需放慢角度';
+
+      service.updateStudentNotes(studentId, newNotes);
+
+      const student = service.students().find(s => s.id === studentId);
+      expect(student?.notes).toBe(newNotes);
+    });
   });
 });
 
@@ -667,81 +744,5 @@ describe('BalletStateService (後端 API 整合與非同步同步機制)', () =>
     service.addTicketPack('stu-1', 'trial', 1, 14, 400);
     expect(service.hasPurchasedTrial('stu-1')).toBeTrue();
   });
-
-  it('【學員歷程查詢】：getStudentAttendanceHistory 應正確關聯課堂資訊並依時間降冪排列', () => {
-    const studentId = 'stu-1';
-    // 預設 mock 資料中 stu-1 有出席記錄
-    const history = service.getStudentAttendanceHistory(studentId);
-
-    expect(history).toBeTruthy();
-    expect(history.length).toBeGreaterThanOrEqual(1);
-
-    // 檢查每筆記錄皆屬於該學員
-    for (const item of history) {
-      expect(item.record.studentId).toBe(studentId);
-      if (item.session) {
-        expect(item.session.id).toBe(item.record.sessionId);
-      }
-    }
-
-    // 新增跨日期的課堂與出席記錄測試降冪排序
-    service.sessions.set([
-      ...service.sessions(),
-      {
-        id: 'session-future-1',
-        date: '2026-10-15',
-        dayOfWeek: '週四',
-        startTime: '19:00',
-        endTime: '20:30',
-        title: '芭蕾進階班',
-        venueName: '敦南 B 廳',
-        venueCost: 2000,
-        feePerStudent: 500,
-        maxCapacity: 10,
-        minThreshold: 4,
-        status: 'scheduled'
-      }
-    ]);
-    service.attendance.set([
-      ...service.attendance(),
-      {
-        id: 'att-future-1',
-        sessionId: 'session-future-1',
-        studentId: studentId,
-        studentName: '陳秀琴',
-        status: 'registered',
-        deductedCount: 0
-      }
-    ]);
-
-    const updatedHistory = service.getStudentAttendanceHistory(studentId);
-    expect(updatedHistory[0].session?.id).toBe('session-future-1');
-  });
-
-  it('【學員票卡歷程】：getStudentTicketPacks 應回傳該學員所有票卡並依購買日期降冪排列', () => {
-    const studentId = 'stu-2';
-    // 先新增一張歷史票卡
-    service.addTicketPack(studentId, '5_class', 5, 60);
-
-    const packs = service.getStudentTicketPacks(studentId);
-    expect(packs.length).toBeGreaterThanOrEqual(2);
-
-    for (const p of packs) {
-      expect(p.studentId).toBe(studentId);
-    }
-
-    for (let i = 0; i < packs.length - 1; i++) {
-      expect(packs[i].purchaseDate.localeCompare(packs[i + 1].purchaseDate)).toBeGreaterThanOrEqual(0);
-    }
-  });
-
-  it('【學員備註更新】：updateStudentNotes 應正確更新學員備註並持久化', () => {
-    const studentId = 'stu-1';
-    const newNotes = '曾有左膝十字韌帶舊傷，做 Grand Plié 時需放慢角度';
-
-    service.updateStudentNotes(studentId, newNotes);
-
-    const student = service.students().find(s => s.id === studentId);
-    expect(student?.notes).toBe(newNotes);
-  });
 });
+

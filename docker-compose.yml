@@ -2,45 +2,47 @@ version: '3.8'
 
 services:
   backend:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
+    image: ghcr.io/${IMAGE_REPO:-derek-lin/triple-d-ballet-class}/tdb-backend:${IMAGE_TAG:-latest}
     container_name: tdb-backend
     restart: unless-stopped
     environment:
       - DATABASE_URL=sqlite:////app/data/triple_d_ballet.db
       - PYTHONUNBUFFERED=1
     volumes:
-      # 持久化資料庫路徑：存放 SQLite 資料庫檔案
-      - ./data:/app/data
+      # 持久化資料庫路徑：存放 SQLite 資料庫檔案（NAS 建議掛載 /volume1/docker/triple-d-ballet/data）
+      - ${DATA_VOLUME_PATH:-./data}:/app/data
     expose:
       - "8000"
     networks:
       - tdb-net
 
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
+    image: ghcr.io/${IMAGE_REPO:-derek-lin/triple-d-ballet-class}/tdb-frontend:${IMAGE_TAG:-latest}
     container_name: tdb-frontend
     restart: unless-stopped
     ports:
       # 外部訪問端口：可依 Synology NAS 習慣修改為其他 port，如 8088:80
-      - "8080:80"
+      - "${FRONTEND_PORT:-8080}:80"
     depends_on:
       - backend
     networks:
       - tdb-net
 
-  tunnel:
-    image: cloudflare/cloudflared:latest
-    container_name: tdb-cloudflared
+  # 選用服務：自動輪詢 GHCR 更新映像檔並無感重啟容器
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: tdb-watchtower
     restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      - TUNNEL_TOKEN=eyJhIjoiZTU5Y2ZiYTMzY2JjYzA0MjI1ZmUwNTFkOTQ1ZGZmZmQiLCJ0IjoiYTkyOTc0NGYtNWQyMS00OWVkLWEyNDgtY2Y3ZWEzM2ZmNzJjIiwicyI6Ill6VTFNemxpWlRBdE1EWmxPUzAwWWpnekxUa3paVEl0TVdVM05EUXdZVFU0WlRKaiJ9
-    command: tunnel --no-autoupdate run
-    depends_on:
-      - frontend
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_INCLUDE_STOPPED=false
+      - WATCHTOWER_REVIVE_STOPPED=false
+    command: tdb-frontend tdb-backend
+    profiles:
+      - auto-update
     networks:
       - tdb-net
 

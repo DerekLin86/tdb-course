@@ -31,12 +31,13 @@ class TicketService:
     ) -> TicketPack:
         """Purchases and activates a new ticket pack for a student."""
         if pack_type == "trial":
-            existing_trial = db.execute(
+            stmt = (
                 select(TicketPack).where(
                     TicketPack.student_id == student_id,
                     TicketPack.type == "trial"
                 )
-            ).scalar_one_or_none()
+            )
+            existing_trial = db.scalars(stmt).first()
             if existing_trial:
                 raise HTTPException(
                     status_code=400,
