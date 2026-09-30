@@ -17,22 +17,20 @@
       </a>
 
       <a
-        routerLink="/student"
+        routerLink="/admin/sessions"
         routerLinkActive="active"
         class="nav-link"
       >
-        學員專區
+        課程管理
       </a>
 
       <a
-        routerLink="/admin"
+        routerLink="/admin/students"
         routerLinkActive="active"
         class="nav-link"
       >
-        老師後台
+        學生管理
       </a>
-
-      <span class="user-greeting">Hi, {{ state.currentStudent()?.name || '學員' }}</span>
     </div>
 
     <!-- 靜態模擬控制器 (簡約優雅風格) -->
@@ -79,20 +77,20 @@
   </a>
 
   <a
-    routerLink="/student"
+    routerLink="/admin/sessions"
     routerLinkActive="active"
     class="tab-item"
   >
     <span class="tab-icon">🩰</span>
-    <span class="tab-label">學員專區</span>
+    <span class="tab-label">課程管理</span>
   </a>
 
   <a
-    routerLink="/admin"
+    routerLink="/admin/students"
     routerLinkActive="active"
     class="tab-item"
   >
-    <span class="tab-icon">📊</span>
-    <span class="tab-label">老師後台</span>
+    <span class="tab-icon">👥</span>
+    <span class="tab-label">學生管理</span>
   </a>
 </nav>

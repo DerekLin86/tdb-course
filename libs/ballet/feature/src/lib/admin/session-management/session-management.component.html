@@ -1,0 +1,576 @@
+<div class="session-management-container">
+  <!-- 頂部標題列 -->
+  <header class="admin-header">
+    <div class="header-titles">
+      <span class="brand-prefix">TRIPLE DREAM BALLET · MANAGEMENT</span>
+      <h1 class="page-title">課堂管理與財務防護</h1>
+      <p class="page-subtitle">
+        當前管理課堂：<strong>{{ session().title }}</strong> · {{ session().date }} ({{ session().dayOfWeek }})
+      </p>
+    </div>
+
+    <div class="header-controls">
+      <!-- 課堂切換下拉選單 -->
+      <div class="session-selector-group">
+        <label for="sessionSelect" class="selector-label">課堂選單：</label>
+        <select
+          id="sessionSelect"
+          class="session-select"
+          [ngModel]="session()?.id"
+          (ngModelChange)="handleSelectSession($event)"
+        >
+          @for (s of allSessions(); track s.id) {
+            <option [value]="s.id">
+              {{ s.date }} ({{ s.dayOfWeek }}) · {{ s.title }} {{ s.status === 'cancelled' ? '【已順延】' : '' }}
+            </option>
+          }
+        </select>
+      </div>
+
+      <!-- 建立新課程按鈕 -->
+      <button
+        type="button"
+        class="btn-create-session"
+        (click)="openCreateModal()"
+      >
+        <span class="btn-icon">＋</span> 建立新課程
+      </button>
+
+      <div class="session-status-tag">
+        @if (session().status === 'cancelled') {
+          <span class="tag-cancelled">本週已順延取消</span>
+        } @else {
+          <span class="tag-active">課堂進行中</span>
+        }
+      </div>
+    </div>
+  </header>
+
+  <!-- 核心區一：開班門檻與場租損益防護監控看板 -->
+  <section class="financial-guard-card">
+    <div class="guard-header">
+      <div class="guard-title-group">
+        <div>
+          <h2 class="guard-title">場租防虧損與開班門檻監控</h2>
+          <p class="guard-sub">固定場租 ${{ financials().venueCost }} / 場 ｜ 每人每堂學費折合 ${{ session().feePerStudent }}</p>
+        </div>
+      </div>
+
+      <!-- 損益警報燈 -->
+      <div
+        class="breakeven-indicator"
+        [class.indicator-safe]="!financials().isAtRisk"
+        [class.indicator-danger]="financials().isAtRisk"
+      >
+        <span class="light-dot"></span>
+        <span class="indicator-text">
+          {{ financials().isAtRisk ? '虧損警戒：未達開班人數門檻' : '營運安全：已達損益平衡門檻' }}
+        </span>
+      </div>
+    </div>
+
+    <!-- 財務指標四格卡 -->
+    <div class="kpi-grid">
+      <div class="kpi-box">
+        <span class="kpi-label">實到 / 應到人數</span>
+        <div class="kpi-value">
+          <strong [class.text-danger]="financials().expectedAttendees < financials().minThreshold">
+            {{ financials().expectedAttendees }}
+          </strong>
+          <span class="kpi-sub">/ {{ financials().totalCapacity }} 人滿班</span>
+        </div>
+        <span class="kpi-note">最低開班門檻：{{ financials().minThreshold }} 人</span>
+      </div>
+
+      <div class="kpi-box">
+        <span class="kpi-label">請假人數統計</span>
+        <div class="kpi-value">
+          <strong>{{ financials().advanceLeaveCount + financials().lateLeaveCount }}</strong>
+          <span class="kpi-sub">人</span>
+        </div>
+        <span class="kpi-note">
+          提前請假 {{ financials().advanceLeaveCount }} ｜ 逾期扣堂 {{ financials().lateLeaveCount }}
+        </span>
+      </div>
+
+      <div class="kpi-box">
+        <span class="kpi-label">當日有效計費額</span>
+        <div class="kpi-value">
+          <strong class="text-revenue">${{ financials().effectiveRevenue }}</strong>
+        </div>
+        <span class="kpi-note">場租成本 ${{ financials().venueCost }}</span>
+      </div>
+
+      <div class="kpi-box">
+        <span class="kpi-label">預估淨結餘</span>
+        <div class="kpi-value">
+          <strong
+            [class.text-profit]="financials().estimatedNetProfit >= 0"
+            [class.text-loss]="financials().estimatedNetProfit < 0"
+          >
+            {{ financials().estimatedNetProfit >= 0 ? '+' : '' }}${{ financials().estimatedNetProfit }}
+          </strong>
+        </div>
+        <span class="kpi-note">
+          {{ financials().estimatedNetProfit >= 0 ? '無虧損風險' : '虧損警報，建議處置' }}
+        </span>
+      </div>
+    </div>
+
+    <!-- 虧損風險警示處置條 -->
+    @if (financials().isAtRisk && session().status !== 'cancelled') {
+      <div class="risk-action-bar">
+        <div class="risk-info">
+          <div>
+            <strong>因請假人數過多，目前僅 {{ financials().expectedAttendees }} 人出席</strong>
+            <p>未達最低 {{ financials().minThreshold }} 人損益平衡門檻，開班將倒貼場租 ${{ Math.abs(financials().estimatedNetProfit) }} 元。</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="btn-defer-session"
+          (click)="handleCancelSession()"
+        >
+          啟動場租防護：本週停課順延（退還堂數）
+        </button>
+      </div>
+    }
+  </section>
+
+  <!-- 課堂出席與簽名存根冊 -->
+  <section class="admin-table-card">
+    <div class="table-header-action">
+      <div class="title-with-desc">
+        <h2 class="table-card-title">課堂出席與簽名存根</h2>
+        <span class="table-tip">點擊學員簽名縮圖可放大調閱存根，防範出勤爭議</span>
+      </div>
+      <button
+        type="button"
+        class="btn-enroll-student"
+        (click)="openEnrollModal()"
+      >
+        <span class="btn-icon">+</span> 加入學員至本堂課
+      </button>
+    </div>
+
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>學員姓名</th>
+            <th>電話</th>
+            <th>出勤狀態</th>
+            <th>簽名存根</th>
+            <th>時間</th>
+            <th>剩餘堂數</th>
+            <th>手動操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (attendanceList().length === 0) {
+            <tr>
+              <td colspan="7" class="empty-roster-cell">
+                <div class="empty-roster-box">
+                  <p class="empty-roster-title">目前本堂課名冊尚無學員</p>
+                  <p class="empty-roster-desc">新建立課堂預設不預先匯入學員資料，請點擊上方按鈕手動加入學員名冊。</p>
+                  <button type="button" class="btn-enroll-inline" (click)="openEnrollModal()">
+                    + 立即手動加入學員
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+          @for (item of attendanceList(); track item.student.id) {
+            <tr [class.row-attended]="item.status === 'attended'">
+              <td class="col-name">
+                <strong>{{ item.student.name }}</strong>
+              </td>
+              <td class="col-phone">{{ item.student.phone }}</td>
+              <td class="col-status">
+                @switch (item.status) {
+                  @case ('attended') {
+                    <span class="badge badge-success">已簽名出席</span>
+                  }
+                  @case ('leave_advance') {
+                    <span class="badge badge-leave">提前請假 (免扣)</span>
+                  }
+                  @case ('leave_late') {
+                    <span class="badge badge-danger">逾期請假 (扣堂)</span>
+                  }
+                  @case ('absent') {
+                    <span class="badge badge-dark">缺席 (扣堂)</span>
+                  }
+                  @default {
+                    <span class="badge badge-pending">待簽到</span>
+                  }
+                }
+              </td>
+              <td class="col-signature">
+                @if (item.signatureDataUrl) {
+                  <div
+                    class="sig-thumbnail-wrap"
+                    (click)="openSignatureModal(item.student.name, item.signedAt || '', item.signatureDataUrl)"
+                    title="點擊放大調閱存根"
+                  >
+                    <img
+                      [src]="item.signatureDataUrl"
+                      [alt]="item.student.name + ' 簽名'"
+                      class="sig-thumb"
+                    />
+                    <span class="thumb-hint">查看</span>
+                  </div>
+                } @else {
+                  <span class="no-sig">-</span>
+                }
+              </td>
+              <td class="col-time">
+                {{ item.signedAt || item.leaveRequestedAt?.slice(11, 16) || '-' }}
+              </td>
+              <td class="col-pack">
+                <span class="pack-count">{{ item.activePack?.remainingCount ?? 0 }} 堂</span>
+              </td>
+              <td class="col-action">
+                <select
+                  class="action-select"
+                  [ngModel]="item.status"
+                  (ngModelChange)="changeAttendance(item.student.id, $event)"
+                >
+                  <option value="registered">待簽到</option>
+                  <option value="attended">已出席</option>
+                  <option value="leave_advance">提前請假 (免扣)</option>
+                  <option value="leave_late">逾期請假 (扣堂)</option>
+                  <option value="absent">缺席 (扣堂)</option>
+                </select>
+                <button
+                  type="button"
+                  class="btn-remove-session"
+                  (click)="handleRemoveFromSession(item.student.id, item.student.name)"
+                  title="自本堂課名冊移出"
+                >
+                  移出名冊
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 手寫簽名存根放大彈窗 -->
+  @if (viewingSignature(); as sig) {
+    <div class="modal-backdrop" (click)="closeSignatureModal()">
+      <div class="signature-viewer-card" (click)="$event.stopPropagation()">
+        <header class="viewer-header">
+          <div>
+            <h3>手寫簽名出勤存根憑證</h3>
+            <p>學員：<strong>{{ sig.name }}</strong> ｜ 時間：{{ sig.time }}</p>
+          </div>
+          <button class="close-btn" (click)="closeSignatureModal()">✕</button>
+        </header>
+
+        <div class="viewer-body">
+          <div class="sig-cert-box">
+            <img [src]="sig.imgUrl" alt="簽名存根原圖" class="sig-large-img" />
+            <div class="cert-stamp">
+              <span>TRIPLE DREAM BALLET VERIFIED</span>
+            </div>
+          </div>
+          <p class="cert-note">
+            此簽名已於教室 iPad 現場由學員本人手寫確認，具備堂數核銷與防爭議依據。
+          </p>
+        </div>
+
+        <footer class="viewer-footer">
+          <button type="button" class="btn-close-viewer" (click)="closeSignatureModal()">
+            關閉檢視
+          </button>
+        </footer>
+      </div>
+    </div>
+  }
+
+  <!-- 建立新課程彈窗 Modal -->
+  @if (showCreateModal()) {
+    <div class="modal-backdrop" (click)="closeCreateModal()">
+      <div class="session-form-card" (click)="$event.stopPropagation()">
+        <header class="form-card-header">
+          <div>
+            <span class="modal-prefix">NEW SCHEDULE · 排定班次</span>
+            <h3>建立新課堂班次</h3>
+            <p>排定新的成人芭蕾課堂並設定開班門檻與場租損益參數</p>
+          </div>
+          <button type="button" class="close-btn" (click)="closeCreateModal()">✕</button>
+        </header>
+
+        <div class="form-card-body">
+          @if (createFormError()) {
+            <div class="form-error-alert">
+              {{ createFormError() }}
+            </div>
+          }
+
+          <div class="form-section">
+            <h4 class="form-section-title">課堂基本資料</h4>
+
+            <div class="form-group">
+              <label for="newSessionTitle" class="form-label">課程名稱 <span class="required">*</span></label>
+              <input
+                id="newSessionTitle"
+                type="text"
+                class="form-input"
+                placeholder="例如：成人優雅芭蕾美姿體雕班"
+                [ngModel]="newSessionTitle()"
+                (ngModelChange)="newSessionTitle.set($event)"
+              />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="newSessionDate" class="form-label">開課日期 <span class="required">*</span></label>
+                <input
+                  id="newSessionDate"
+                  type="date"
+                  class="form-input"
+                  [ngModel]="newSessionDate()"
+                  (ngModelChange)="newSessionDate.set($event)"
+                />
+              </div>
+
+              <div class="form-group flex-1">
+                <label class="form-label">星期（自動換算）</label>
+                <div class="form-readonly-badge">
+                  {{ newSessionDayOfWeek() || '請先選擇日期' }}
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="newSessionStart" class="form-label">開始時間 <span class="required">*</span></label>
+                <input
+                  id="newSessionStart"
+                  type="time"
+                  class="form-input"
+                  [ngModel]="newSessionStartTime()"
+                  (ngModelChange)="newSessionStartTime.set($event)"
+                />
+              </div>
+              <div class="form-group flex-1">
+                <label for="newSessionEnd" class="form-label">結束時間 <span class="required">*</span></label>
+                <input
+                  id="newSessionEnd"
+                  type="time"
+                  class="form-input"
+                  [ngModel]="newSessionEndTime()"
+                  (ngModelChange)="newSessionEndTime.set($event)"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="newSessionVenue" class="form-label">上課教室地點 <span class="required">*</span></label>
+              <input
+                id="newSessionVenue"
+                type="text"
+                class="form-input"
+                placeholder="例如：敦南日光舞蹈排練室 A 廳"
+                [ngModel]="newSessionVenue()"
+                (ngModelChange)="newSessionVenue.set($event)"
+              />
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4 class="form-section-title">場租損益與開班門檻</h4>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="newSessionCost" class="form-label">固定場租成本 (NT$) <span class="required">*</span></label>
+                <input
+                  id="newSessionCost"
+                  type="number"
+                  class="form-input"
+                  min="0"
+                  step="100"
+                  [ngModel]="newSessionVenueCost()"
+                  (ngModelChange)="newSessionVenueCost.set($event)"
+                />
+              </div>
+              <div class="form-group flex-1">
+                <label for="newSessionFee" class="form-label">每人每堂折合 (NT$) <span class="required">*</span></label>
+                <input
+                  id="newSessionFee"
+                  type="number"
+                  class="form-input"
+                  min="0"
+                  step="50"
+                  [ngModel]="newSessionFeePerStudent()"
+                  (ngModelChange)="newSessionFeePerStudent.set($event)"
+                />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="newSessionCap" class="form-label">班級滿額人數 <span class="required">*</span></label>
+                <input
+                  id="newSessionCap"
+                  type="number"
+                  class="form-input"
+                  min="1"
+                  max="50"
+                  [ngModel]="newSessionMaxCapacity()"
+                  (ngModelChange)="newSessionMaxCapacity.set($event)"
+                />
+              </div>
+              <div class="form-group flex-1">
+                <label for="newSessionThreshold" class="form-label">開班防虧損門檻 (人) <span class="required">*</span></label>
+                <input
+                  id="newSessionThreshold"
+                  type="number"
+                  class="form-input"
+                  min="1"
+                  max="50"
+                  [ngModel]="newSessionMinThreshold()"
+                  (ngModelChange)="newSessionMinThreshold.set($event)"
+                />
+              </div>
+            </div>
+            <p class="form-tip">
+              防虧損機制：開課前出席人數若少於 {{ newSessionMinThreshold() }} 人，系統將觸發虧損警示，並支援老師一鍵順延停課以保護場租不倒貼。
+            </p>
+          </div>
+        </div>
+
+        <footer class="form-card-footer">
+          <button type="button" class="btn-cancel" (click)="closeCreateModal()">取消</button>
+          <button type="button" class="btn-submit" (click)="submitCreateSession()">確認建立課堂</button>
+        </footer>
+      </div>
+    </div>
+  }
+
+  <!-- 手動加入學員至課堂彈窗 -->
+  @if (showEnrollModal()) {
+    <div class="modal-backdrop" (click)="closeEnrollModal()">
+      <div class="modal-card modal-enroll" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>加入學員至本堂課</h3>
+          <button type="button" class="btn-close" (click)="closeEnrollModal()">✕</button>
+        </div>
+
+        <div class="modal-segmented-nav">
+          <button
+            type="button"
+            class="seg-btn"
+            [class.active]="enrollMode() === 'existing'"
+            (click)="enrollMode.set('existing')"
+          >
+            選擇現有學員
+          </button>
+          <button
+            type="button"
+            class="seg-btn"
+            [class.active]="enrollMode() === 'new'"
+            (click)="enrollMode.set('new')"
+          >
+            + 建立新學員並加入
+          </button>
+        </div>
+
+        <div class="modal-body">
+          @if (enrollError()) {
+            <div class="alert-error">{{ enrollError() }}</div>
+          }
+
+          <p class="modal-desc">
+            當前課堂：<strong>{{ session().title }}</strong>（{{ session().date }} {{ session().dayOfWeek }}）
+          </p>
+
+          @if (enrollMode() === 'existing') {
+            @if (availableStudentsToEnroll().length === 0) {
+              <div class="empty-available-box">
+                <p>全班所有學員皆已在此堂課名冊中！</p>
+                <span class="sub-hint">若需新增未建檔學員，請切換至「+ 建立新學員並加入」標籤。</span>
+              </div>
+            } @else {
+              <div class="form-group">
+                <label>選擇學員</label>
+                <select
+                  class="form-control"
+                  [ngModel]="selectedStudentToEnroll()"
+                  (ngModelChange)="selectedStudentToEnroll.set($event)"
+                >
+                  @for (s of availableStudentsToEnroll(); track s.id) {
+                    <option [value]="s.id">
+                      {{ s.name }} (剩餘: {{ s.activePack?.remainingCount ?? 0 }} 堂 / {{ s.phone }})
+                    </option>
+                  }
+                </select>
+              </div>
+            }
+          } @else {
+            <div class="form-group">
+              <label>學員姓名 <span class="required">*</span></label>
+              <input
+                type="text"
+                class="form-control"
+                placeholder="請輸入姓名（例如：林小美）"
+                [ngModel]="newQuickStudentName()"
+                (ngModelChange)="newQuickStudentName.set($event)"
+              />
+            </div>
+
+            <div class="form-group">
+              <label>聯絡電話 <span class="required">*</span></label>
+              <input
+                type="tel"
+                class="form-control"
+                placeholder="09xx-xxx-xxx"
+                [ngModel]="newQuickStudentPhone()"
+                (ngModelChange)="newQuickStudentPhone.set($event)"
+              />
+            </div>
+
+            <div class="form-group">
+              <label>初始票卡方案</label>
+              <select
+                class="form-control"
+                [ngModel]="newQuickStudentPackType()"
+                (ngModelChange)="newQuickStudentPackType.set($event)"
+              >
+                <option value="trial">單堂體驗課優惠方案（1 堂 / 14 天 / NT$ 400）</option>
+                <option value="10_class">10 堂票卡方案 ($5,000 / 效期 100 天)</option>
+                <option value="5_class">5 堂票卡方案 ($2,500 / 效期 60 天)</option>
+                <option value="none">暫不購買票卡 (0 堂)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>身體狀況備註</label>
+              <input
+                type="text"
+                class="form-control"
+                placeholder="例：膝蓋舊傷、初學入門"
+                [ngModel]="newQuickStudentNotes()"
+                (ngModelChange)="newQuickStudentNotes.set($event)"
+              />
+            </div>
+          }
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-cancel" (click)="closeEnrollModal()">取消</button>
+          @if (enrollMode() === 'existing') {
+            @if (availableStudentsToEnroll().length > 0) {
+              <button type="button" class="btn-primary" (click)="submitEnrollStudent()">確認加入</button>
+            }
+          } @else {
+            <button type="button" class="btn-primary" (click)="submitQuickCreateAndEnroll()">建立並加入本課</button>
+          }
+        </div>
+      </div>
+    </div>
+  }
+</div>

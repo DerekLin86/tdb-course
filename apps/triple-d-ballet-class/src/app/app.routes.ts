@@ -13,16 +13,21 @@ export const routes: Routes = [
     title: '教室 iPad 簽到台 (模式 A) | Triple-D 芭蕾'
   },
   {
-    path: 'student',
-    loadComponent: () =>
-      import('@libs/ballet/feature').then(m => m.StudentViewComponent),
-    title: '學員手機端 (LINE 友善) | Triple-D 芭蕾'
+    path: 'admin',
+    redirectTo: 'admin/sessions',
+    pathMatch: 'full'
   },
   {
-    path: 'admin',
+    path: 'admin/sessions',
     loadComponent: () =>
-      import('@libs/ballet/feature').then(m => m.AdminDashboardComponent),
-    title: '老師管理後台與損益防虧 | Triple-D 芭蕾'
+      import('@libs/ballet/feature').then(m => m.SessionManagementComponent),
+    title: '課堂管理與場租防護 | Triple-D 芭蕾'
+  },
+  {
+    path: 'admin/students',
+    loadComponent: () =>
+      import('@libs/ballet/feature').then(m => m.StudentManagementComponent),
+    title: '學員票卡與歷程管理 | Triple-D 芭蕾'
   },
   {
     path: '**',

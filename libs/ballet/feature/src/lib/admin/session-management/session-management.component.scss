@@ -1,0 +1,1089 @@
+// =============================================================================
+// Triple Dream Ballet (TDB) - Session Management Styles
+// =============================================================================
+
+// --- Reusable Placeholder Selectors ---
+%btn-berry-base {
+  display: inline-flex;
+  align-items: center;
+  background: #8e5b69;
+  color: #ffffff;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(142, 91, 105, 0.2);
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #784855;
+    box-shadow: 0 6px 16px rgba(142, 91, 105, 0.3);
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+%modal-card-base {
+  background: #ffffff;
+  width: 92%;
+  overflow: hidden;
+  box-shadow: 0 25px 60px -15px rgba(25, 35, 45, 0.25);
+  display: flex;
+  flex-direction: column;
+  animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+%modal-close-btn {
+  background: #f1f5f9;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 0.95rem;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #e2e8f0;
+    color: #1e293b;
+  }
+}
+
+%modal-error-alert {
+  background: #fdf2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 0.65rem 1rem;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+%modal-form-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+
+  .required {
+    color: #dc2626;
+  }
+}
+
+%modal-form-input {
+  padding: 0.6rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  font-size: 0.92rem;
+  color: #1e293b;
+  background: #ffffff;
+  outline: none;
+  box-sizing: border-box;
+  width: 100%;
+  font-family: inherit;
+  transition: all 0.2s ease;
+
+  &:focus {
+    border-color: #8e5b69;
+    box-shadow: 0 0 0 3px rgba(142, 91, 105, 0.12);
+  }
+}
+
+%modal-footer-base {
+  background: #fafbfc;
+  border-top: 1px solid #edf2f7;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.85rem;
+
+  .btn-cancel {
+    background: #f1f5f9;
+    color: #475569;
+    border: none;
+    padding: 0.6rem 1.25rem;
+    border-radius: 10px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+
+    &:hover {
+      background: #e2e8f0;
+    }
+  }
+
+  .btn-submit,
+  .btn-primary {
+    @extend %btn-berry-base;
+    padding: 0.6rem 1.5rem;
+    border-radius: 10px;
+    font-size: 0.92rem;
+  }
+}
+
+// --- Layout & Container ---
+.session-management-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+
+  @media (min-width: 768px) and (max-width: 1024px) {
+    padding: 1.25rem 1.5rem 3rem;
+    gap: 1.5rem;
+  }
+
+  @media (max-width: 767px) {
+    padding: 0.75rem 1rem 2.5rem;
+    gap: 1.25rem;
+  }
+}
+
+.admin-header,
+.admin-table-card {
+  background: #ffffff;
+  border-radius: 24px;
+  border: 1px solid #e7edf3;
+  box-shadow: 0 10px 30px -5px rgba(50, 70, 90, 0.05);
+}
+
+// --- 頂部標題列 ---
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.75rem 2rem;
+
+  .brand-prefix {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #8e5b69;
+    letter-spacing: 0.12em;
+  }
+
+  .page-title {
+    margin: 0.35rem 0 0.2rem;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #263342;
+  }
+
+  .page-subtitle {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #64748b;
+  }
+
+  .header-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .session-selector-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .selector-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #546474;
+    white-space: nowrap;
+  }
+
+  .session-select {
+    padding: 0.5rem 0.85rem;
+    border-radius: 12px;
+    border: 1px solid #d4dde5;
+    background: #f8fafc;
+    color: #263342;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s ease;
+
+    &:focus {
+      border-color: #8e5b69;
+      box-shadow: 0 0 0 3px rgba(142, 91, 105, 0.15);
+      background: #ffffff;
+    }
+  }
+
+  .btn-create-session {
+    @extend %btn-berry-base;
+    gap: 0.4rem;
+    padding: 0.55rem 1.15rem;
+    border-radius: 14px;
+    font-size: 0.9rem;
+
+    .btn-icon {
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+  }
+
+  .tag-active,
+  .tag-cancelled {
+    padding: 0.4rem 0.9rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .tag-active {
+    background: #eef7f2;
+    color: #2b704c;
+  }
+
+  .tag-cancelled {
+    background: #fdf2f2;
+    color: #dc2626;
+  }
+
+  @media (max-width: 767px) {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1.25rem 1rem;
+    gap: 1.25rem;
+
+    .header-controls {
+      width: 100%;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.75rem;
+    }
+
+    .session-selector-group {
+      width: 100%;
+
+      .session-select {
+        flex: 1;
+      }
+    }
+
+    .btn-create-session {
+      justify-content: center;
+      min-height: 44px;
+    }
+
+    .session-status-tag {
+      text-align: center;
+    }
+  }
+}
+
+// --- 核心區一：開班門檻與場租損益防護看板 ---
+.financial-guard-card {
+  background: #ffffff;
+  border-radius: 24px;
+  border: 1px solid #e7edf3;
+  padding: 1.75rem;
+  box-shadow: 0 10px 30px -5px rgba(50, 70, 90, 0.05);
+
+  .guard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .guard-title {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #263342;
+  }
+
+  .guard-sub {
+    margin: 0.25rem 0 0;
+    font-size: 0.88rem;
+    color: #7b8b9c;
+  }
+
+  .breakeven-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+
+    .light-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    &.indicator-safe {
+      background: #eef7f2;
+      color: #2b704c;
+
+      .light-dot {
+        background: #22c55e;
+        box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+      }
+    }
+
+    &.indicator-danger {
+      background: #fdf2f2;
+      color: #b91c1c;
+
+      .light-dot {
+        background: #ef4444;
+        box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+        animation: pulse 1.5s infinite;
+      }
+    }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+
+    @media (min-width: 768px) and (max-width: 1024px) {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+
+    @media (max-width: 767px) {
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+  }
+
+  .kpi-box {
+    background: #f8fafc;
+    border-radius: 16px;
+    padding: 1.2rem;
+    border: 1px solid #eef3f7;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+
+    .kpi-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #64748b;
+    }
+
+    .kpi-value {
+      margin: 0.5rem 0 0.25rem;
+
+      strong {
+        font-size: 1.7rem;
+        font-weight: 800;
+        color: #263342;
+      }
+
+      .kpi-sub {
+        font-size: 0.88rem;
+        color: #8796a5;
+        margin-left: 0.25rem;
+      }
+
+      .text-danger {
+        color: #ef4444;
+      }
+
+      .text-revenue {
+        color: #8e5b69;
+      }
+
+      .text-profit {
+        color: #10b981;
+      }
+
+      .text-loss {
+        color: #ef4444;
+      }
+    }
+
+    .kpi-note {
+      font-size: 0.78rem;
+      color: #8796a5;
+    }
+  }
+
+  .risk-action-bar {
+    background: #fef2f2;
+    border: 1px solid #fee2e2;
+    border-radius: 16px;
+    padding: 1rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+
+    .risk-info {
+      strong {
+        color: #991b1b;
+        font-size: 0.95rem;
+      }
+
+      p {
+        margin: 0.2rem 0 0;
+        color: #b91c1c;
+        font-size: 0.85rem;
+      }
+    }
+
+    .btn-defer-session {
+      background: #dc2626;
+      color: #ffffff;
+      border: none;
+      padding: 0.65rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: 0 4px 10px rgba(220, 38, 38, 0.2);
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: #b91c1c;
+        transform: translateY(-1px);
+      }
+    }
+
+    @media (max-width: 767px) {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.75rem;
+
+      .btn-defer-session {
+        min-height: 44px;
+        width: 100%;
+        text-align: center;
+      }
+    }
+  }
+}
+
+// --- 表格卡片與資料表格 ---
+.admin-table-card {
+  padding: 1.75rem;
+
+  .table-header-action {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .title-with-desc {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .table-card-title {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #263342;
+  }
+
+  .table-tip {
+    font-size: 0.85rem;
+    color: #7b8b9c;
+  }
+
+  .btn-enroll-student {
+    @extend %btn-berry-base;
+    gap: 0.35rem;
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    font-size: 0.88rem;
+
+    .btn-icon {
+      font-size: 1rem;
+      line-height: 1;
+    }
+  }
+
+  @media (max-width: 767px) {
+    padding: 1.25rem 1rem;
+
+    .table-header-action {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .btn-enroll-student {
+      width: 100%;
+      justify-content: center;
+      min-height: 44px;
+    }
+  }
+}
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+
+  th,
+  td {
+    padding: 1rem 1.1rem;
+    text-align: left;
+    border-bottom: 1px solid #edf2f7;
+  }
+
+  th {
+    background: #fafbfc;
+    color: #64748b;
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+
+  tr:hover td {
+    background: #fafbfc;
+  }
+
+  .col-name {
+    font-size: 1.1rem;
+    color: #263342;
+  }
+
+  .col-phone {
+    color: #64748b;
+    font-family: monospace;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+
+    &.badge-success {
+      background: #eef7f2;
+      color: #2b704c;
+    }
+
+    &.badge-leave {
+      background: #f1f4f7;
+      color: #64748b;
+    }
+
+    &.badge-danger {
+      background: #fdf2f2;
+      color: #b91c1c;
+    }
+
+    &.badge-dark {
+      background: #334155;
+      color: #ffffff;
+    }
+
+    &.badge-pending {
+      background: #fdf5f7;
+      color: #8e5b69;
+    }
+  }
+
+  .sig-thumbnail-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    background: #ffffff;
+    border: 1px solid #dbe4ee;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+
+    &:hover {
+      border-color: #8e5b69;
+    }
+
+    .sig-thumb {
+      height: 24px;
+      max-width: 65px;
+      object-fit: contain;
+    }
+
+    .thumb-hint {
+      font-size: 0.75rem;
+      color: #8e5b69;
+      font-weight: 600;
+    }
+  }
+
+  .no-sig {
+    color: #cbd5e1;
+  }
+
+  .pack-count {
+    color: #8e5b69;
+    font-weight: 700;
+    font-size: 1.05rem;
+  }
+
+  .action-select {
+    padding: 0.35rem 0.65rem;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    font-size: 0.85rem;
+    background: #ffffff;
+    cursor: pointer;
+  }
+
+  .col-action {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+
+    .btn-remove-session {
+      background: #fff1f2;
+      color: #be123c;
+      border: 1px solid #fecdd3;
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      &:hover {
+        background: #ffe4e6;
+        border-color: #fda4af;
+        color: #9f1239;
+      }
+    }
+  }
+
+  .empty-roster-cell {
+    padding: 3.5rem 1.5rem !important;
+    text-align: center;
+    background: #fafbfc;
+  }
+
+  .empty-roster-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    max-width: 480px;
+    margin: 0 auto;
+
+    .empty-roster-title {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #263342;
+    }
+
+    .empty-roster-desc {
+      margin: 0;
+      font-size: 0.88rem;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    .btn-enroll-inline {
+      @extend %btn-berry-base;
+      margin-top: 0.75rem;
+      padding: 0.55rem 1.25rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+    }
+  }
+}
+
+// --- 彈窗基底與動畫 ---
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+@keyframes modalPop {
+  0% { opacity: 0; transform: scale(0.96) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+// --- 簽名調閱彈窗卡片 ---
+.signature-viewer-card {
+  @extend %modal-card-base;
+  max-width: 480px;
+  border-radius: 20px;
+
+  .viewer-header {
+    padding: 1.25rem 1.5rem;
+    background: #fafbfc;
+    border-bottom: 1px solid #edf2f7;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    h3 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #1e293b;
+    }
+
+    p {
+      margin: 0.25rem 0 0;
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+
+    .close-btn {
+      @extend %modal-close-btn;
+    }
+  }
+
+  .viewer-body {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    .sig-cert-box {
+      width: 100%;
+      height: 200px;
+      background: #fdfaf6;
+      border: 2px dashed #e2d9cf;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+
+      .sig-large-img {
+        max-width: 85%;
+        max-height: 80%;
+        object-fit: contain;
+      }
+
+      .cert-stamp {
+        position: absolute;
+        bottom: 8px;
+        right: 12px;
+        border: 1px solid #8e5b69;
+        color: #8e5b69;
+        font-size: 0.65rem;
+        font-weight: 700;
+        padding: 0.15rem 0.4rem;
+        border-radius: 4px;
+        opacity: 0.5;
+        letter-spacing: 0.05em;
+      }
+    }
+
+    .cert-note {
+      margin: 1rem 0 0;
+      font-size: 0.82rem;
+      color: #8796a5;
+      text-align: center;
+      line-height: 1.4;
+    }
+  }
+
+  .viewer-footer {
+    @extend %modal-footer-base;
+    padding: 1rem 1.5rem;
+
+    .btn-close-viewer {
+      background: #f1f5f9;
+      color: #475569;
+      border: none;
+      padding: 0.55rem 1.25rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease;
+
+      &:hover {
+        background: #e2e8f0;
+      }
+    }
+  }
+}
+
+// --- 課程與學員表單彈窗卡片 ---
+.session-form-card {
+  @extend %modal-card-base;
+  max-width: 600px;
+  border-radius: 24px;
+  max-height: 90vh;
+
+  .form-card-header {
+    padding: 1.5rem 1.75rem 1.25rem;
+    background: #ffffff;
+    border-bottom: 1px solid #edf2f7;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+
+    .modal-prefix {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #8e5b69;
+      letter-spacing: 0.1em;
+    }
+
+    h3 {
+      margin: 0.2rem 0 0.1rem;
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #1e293b;
+    }
+
+    p {
+      margin: 0;
+      font-size: 0.88rem;
+      color: #64748b;
+    }
+
+    .close-btn {
+      @extend %modal-close-btn;
+    }
+  }
+
+  .form-card-body {
+    padding: 1.5rem 1.75rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+
+    .form-error-alert {
+      @extend %modal-error-alert;
+    }
+
+    .form-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+
+      .form-section-title {
+        margin: 0 0 0.25rem;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #1e293b;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+
+        .form-label {
+          @extend %modal-form-label;
+        }
+
+        .form-input {
+          @extend %modal-form-input;
+        }
+
+        .form-readonly-badge {
+          padding: 0.6rem 0.85rem;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          font-size: 0.92rem;
+          color: #64748b;
+          font-weight: 600;
+        }
+      }
+
+      .form-row {
+        display: flex;
+        gap: 1rem;
+
+        .flex-1 {
+          flex: 1;
+        }
+
+        @media (max-width: 600px) {
+          flex-direction: column;
+        }
+      }
+
+      .form-tip {
+        margin: 0;
+        font-size: 0.82rem;
+        color: #7b8b9c;
+        line-height: 1.4;
+      }
+    }
+  }
+
+  .form-card-footer {
+    @extend %modal-footer-base;
+    padding: 1.25rem 1.75rem;
+  }
+}
+
+// --- 手動加入學員彈窗 ---
+.modal-card.modal-enroll {
+  @extend %modal-card-base;
+  max-width: 500px;
+  border-radius: 24px;
+  max-height: 90vh;
+
+  .modal-header {
+    padding: 1.5rem 1.75rem 1rem;
+    border-bottom: 1px solid #edf2f7;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    h3 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #1e293b;
+    }
+
+    .btn-close {
+      @extend %modal-close-btn;
+    }
+  }
+
+  .modal-segmented-nav {
+    display: flex;
+    padding: 0.75rem 1.75rem 0;
+    gap: 0.5rem;
+    background: #fafbfc;
+    border-bottom: 1px solid #edf2f7;
+
+    .seg-btn {
+      flex: 1;
+      padding: 0.6rem 0.5rem;
+      border: none;
+      background: transparent;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s ease;
+
+      &.active {
+        color: #8e5b69;
+        border-bottom-color: #8e5b69;
+      }
+
+      &:hover:not(.active) {
+        color: #1e293b;
+      }
+    }
+  }
+
+  .modal-body {
+    padding: 1.5rem 1.75rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+
+    .alert-error {
+      @extend %modal-error-alert;
+    }
+
+    .modal-desc {
+      margin: 0;
+      font-size: 0.88rem;
+      color: #64748b;
+      line-height: 1.4;
+
+      strong {
+        color: #1e293b;
+      }
+    }
+
+    .empty-available-box {
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+
+      p {
+        margin: 0;
+        font-weight: 600;
+        color: #334155;
+        font-size: 0.95rem;
+      }
+
+      .sub-hint {
+        display: block;
+        margin-top: 0.35rem;
+        font-size: 0.82rem;
+        color: #64748b;
+      }
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+
+      label {
+        @extend %modal-form-label;
+      }
+
+      .form-control {
+        @extend %modal-form-input;
+      }
+
+      select.form-control {
+        cursor: pointer;
+      }
+    }
+  }
+
+  .modal-footer {
+    @extend %modal-footer-base;
+    padding: 1.25rem 1.75rem;
+  }
+}
