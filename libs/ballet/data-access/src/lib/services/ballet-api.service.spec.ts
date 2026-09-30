@@ -208,7 +208,11 @@ describe('BalletApiService', () => {
         isAtRisk: false,
         effectiveRevenue: 2500,
         venueCost: 2000,
-        estimatedNetProfit: 500
+        teacherFee: 1200,
+        otherCost: 0,
+        totalCost: 3200,
+        estimatedNetProfit: 500,
+        breakEvenAttendees: 7
       };
 
       service.getSessionFinancials('session-upcoming').subscribe(stats => {

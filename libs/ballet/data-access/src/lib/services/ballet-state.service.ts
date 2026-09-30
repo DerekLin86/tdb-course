@@ -1,7 +1,19 @@
 import { Injectable, signal, computed, effect, inject } from '@angular/core';
 import { forkJoin, of, catchError } from 'rxjs';
 import { Student, TicketPack, StudentWithActivePack, TicketPackType, CreateStudentParams, UpdateStudentParams } from '../types/student.type';
-import { AttendanceRecord, AttendanceStatus, ClassSession, CreateClassSessionParams, SessionFinancialStats, StudentAttendanceHistoryItem } from '../types/attendance.type';
+import {
+  AttendanceRecord,
+  AttendanceStatus,
+  ClassSession,
+  CreateClassSessionParams,
+  SessionFinancialStats,
+  StudentAttendanceHistoryItem,
+  Course,
+  CourseFinancialStats,
+  CreateCourseParams,
+  StudentCourseProgress,
+  StudentCourseSessionDetail
+} from '../types/attendance.type';
 import { BalletApiService } from './ballet-api.service';
 
 const STORAGE_KEY = 'triple_d_ballet_state_v1';
@@ -13,6 +25,7 @@ export class BalletStateService {
   private readonly api = inject(BalletApiService, { optional: true });
 
   // 基礎 Signals
+  readonly courses = signal<Course[]>([]);
   readonly students = signal<Student[]>([]);
   readonly ticketPacks = signal<TicketPack[]>([]);
   readonly sessions = signal<ClassSession[]>([]);
@@ -24,19 +37,184 @@ export class BalletStateService {
   readonly lastSyncError = signal<string | null>(null);
 
   // 當前選取狀態
+  readonly selectedCourseId = signal<string>('course-1');
   readonly selectedSessionId = signal<string>('session-upcoming');
   readonly selectedStudentId = signal<string>('stu-1');
 
   // 測試輔助：模擬距離開課的小時數（預設 30 小時，方便切換驗證 24h 前後）
   readonly simulationHoursUntilClass = signal<number>(30);
 
-  // 1. 當前課堂 Computed
+  // 1. 當前課程 Computed
+  readonly currentCourse = computed(() => {
+    const id = this.selectedCourseId();
+    return this.courses().find(c => c.id === id) || this.courses()[0];
+  });
+
+  // 2. 當前課程包含之課堂清單 Computed
+  readonly currentCourseSessions = computed(() => {
+    const course = this.currentCourse();
+    if (!course) return [];
+    return this.sessions()
+      .filter(s => s.courseId === course.id)
+      .sort((a, b) => (a.sessionIndex ?? 0) - (b.sessionIndex ?? 0) || a.date.localeCompare(b.date));
+  });
+
+  // 3. 全期課程總體財務與營運統計 Computed
+  readonly currentCourseFinancials = computed<CourseFinancialStats>(() => {
+    const course = this.currentCourse();
+    const sessions = this.currentCourseSessions();
+
+    if (!course) {
+      return {
+        courseId: '',
+        courseTitle: '',
+        totalSessions: 0,
+        completedSessions: 0,
+        scheduledSessions: 0,
+        totalVenueCost: 0,
+        totalTeacherFee: 0,
+        totalOtherCost: 0,
+        totalCost: 0,
+        totalRevenue: 0,
+        accumulatedNetProfit: 0,
+        averageAttendanceRate: 0
+      };
+    }
+
+    const allAttendance = this.attendance();
+    let totalVenueCost = 0;
+    let totalTeacherFee = 0;
+    let totalOtherCost = 0;
+    let totalRevenue = 0;
+    let completedCount = 0;
+    let scheduledCount = 0;
+    let totalAttendedCount = 0;
+    let totalEnrolledCount = 0;
+
+    for (const s of sessions) {
+      if (s.status === 'completed') {
+        completedCount++;
+      } else if (s.status === 'scheduled') {
+        scheduledCount++;
+      }
+
+      if (s.status !== 'cancelled') {
+        const vCost = s.venueCost ?? course.defaultVenueCost ?? 2000;
+        const tCost = s.teacherFee ?? course.defaultTeacherFee ?? 1200;
+        const oCost = s.otherCost ?? 0;
+        totalVenueCost += vCost;
+        totalTeacherFee += tCost;
+        totalOtherCost += oCost;
+
+        const records = allAttendance.filter(a => a.sessionId === s.id);
+        let billable = 0;
+        let attended = 0;
+
+        for (const r of records) {
+          if (r.status === 'attended') {
+            attended++;
+            billable++;
+          } else if (r.status === 'leave_late' || r.status === 'absent' || r.status === 'registered') {
+            billable++;
+          }
+        }
+
+        const fee = s.feePerStudent ?? course.defaultFeePerStudent ?? 500;
+        totalRevenue += billable * fee;
+        totalAttendedCount += attended;
+        totalEnrolledCount += records.length;
+      }
+    }
+
+    const totalCost = totalVenueCost + totalTeacherFee + totalOtherCost;
+    const accumulatedNetProfit = totalRevenue - totalCost;
+    const averageAttendanceRate = totalEnrolledCount > 0
+      ? Math.round((totalAttendedCount / totalEnrolledCount) * 100)
+      : 0;
+
+    return {
+      courseId: course.id,
+      courseTitle: course.title,
+      totalSessions: course.totalSessions,
+      completedSessions: completedCount,
+      scheduledSessions: scheduledCount,
+      totalVenueCost,
+      totalTeacherFee,
+      totalOtherCost,
+      totalCost,
+      totalRevenue,
+      accumulatedNetProfit,
+      averageAttendanceRate
+    };
+  });
+
+  // 4. 學員在該課程各堂課的出席狀態與進度明細 Computed
+  readonly currentCourseStudentProgress = computed<StudentCourseProgress[]>(() => {
+    const course = this.currentCourse();
+    const sessions = this.currentCourseSessions();
+    if (!course) return [];
+
+    const students = this.students();
+    const allAttendance = this.attendance();
+
+    return students.map(stu => {
+      let attendedCount = 0;
+      let leaveCount = 0;
+      let absentCount = 0;
+      let registeredCount = 0;
+
+      const sessionDetails: StudentCourseSessionDetail[] = sessions.map((s, idx) => {
+        const rec = allAttendance.find(a => a.sessionId === s.id && a.studentId === stu.id);
+        const sessionIndex = s.sessionIndex ?? (idx + 1);
+        if (!rec) {
+          return {
+            sessionId: s.id,
+            sessionIndex,
+            date: s.date,
+            status: 'unregistered' as const
+          };
+        }
+
+        if (rec.status === 'attended') attendedCount++;
+        else if (rec.status === 'leave_advance' || rec.status === 'leave_late') leaveCount++;
+        else if (rec.status === 'absent') absentCount++;
+        else if (rec.status === 'registered') registeredCount++;
+
+        return {
+          sessionId: s.id,
+          sessionIndex,
+          date: s.date,
+          status: rec.status,
+          signedAt: rec.signedAt
+        };
+      });
+
+      const totalCourseSessions = course.totalSessions || (sessions.length > 0 ? sessions.length : 1);
+      const attendanceRate = totalCourseSessions > 0
+        ? Math.round((attendedCount / totalCourseSessions) * 100)
+        : 0;
+
+      return {
+        studentId: stu.id,
+        studentName: stu.name,
+        attendedCount,
+        leaveCount,
+        absentCount,
+        registeredCount,
+        totalCourseSessions,
+        attendanceRate,
+        sessionDetails
+      };
+    });
+  });
+
+  // 5. 當前課堂 Computed
   readonly currentSession = computed(() => {
     const id = this.selectedSessionId();
     return this.sessions().find(s => s.id === id) || this.sessions()[0];
   });
 
-  // 2. 當前課堂所有學生簽到記錄 Computed
+  // 6. 當前課堂所有學生簽到記錄 Computed
   readonly currentSessionAttendance = computed(() => {
     const curr = this.currentSession();
     if (!curr) return [];
@@ -56,7 +234,7 @@ export class BalletStateService {
     });
   });
 
-  // 3. 當前課堂財務與開班門檻損益 Computed
+  // 7. 當前課堂財務與開班門檻損益 Computed
   readonly currentSessionFinancials = computed<SessionFinancialStats>(() => {
     const curr = this.currentSession();
     if (!curr) {
@@ -71,7 +249,11 @@ export class BalletStateService {
         isAtRisk: false,
         effectiveRevenue: 0,
         venueCost: 2000,
-        estimatedNetProfit: 0
+        teacherFee: 1200,
+        otherCost: 0,
+        totalCost: 3200,
+        estimatedNetProfit: -3200,
+        breakEvenAttendees: 7
       };
     }
 
@@ -103,10 +285,15 @@ export class BalletStateService {
     }
 
     const expectedAttendees = registered + attended;
-    // 有效計費人次 = 已出席 + 逾期請假扣堂 + 缺席扣堂
-    const billableCount = attended + lateLeave + absent + registered; // 預約中的若開課即計費
+    // 有效計費人次 = 已出席 + 逾期請假扣堂 + 缺席扣堂 + 預約應到
+    const billableCount = attended + lateLeave + absent + registered;
     const effectiveRevenue = billableCount * curr.feePerStudent;
-    const estimatedNetProfit = effectiveRevenue - curr.venueCost;
+    const venueCost = curr.venueCost;
+    const teacherFee = curr.teacherFee ?? 1200;
+    const otherCost = curr.otherCost ?? 0;
+    const totalCost = venueCost + teacherFee + otherCost;
+    const estimatedNetProfit = effectiveRevenue - totalCost;
+    const breakEvenAttendees = Math.ceil(totalCost / (curr.feePerStudent || 1));
     const isAtRisk = expectedAttendees < curr.minThreshold;
 
     return {
@@ -119,8 +306,12 @@ export class BalletStateService {
       minThreshold: curr.minThreshold,
       isAtRisk,
       effectiveRevenue,
-      venueCost: curr.venueCost,
-      estimatedNetProfit
+      venueCost,
+      teacherFee,
+      otherCost,
+      totalCost,
+      estimatedNetProfit,
+      breakEvenAttendees
     };
   });
 
@@ -175,6 +366,8 @@ export class BalletStateService {
     // 當狀態改變時自動同步至 LocalStorage
     effect(() => {
       const stateToSave = {
+        courses: this.courses(),
+        selectedCourseId: this.selectedCourseId(),
         students: this.students(),
         ticketPacks: this.ticketPacks(),
         sessions: this.sessions(),
@@ -853,21 +1046,162 @@ export class BalletStateService {
     }
   }
 
+  // 建立新期班課程
+  createCourse(params: CreateCourseParams): Course {
+    const newCourse: Course = {
+      id: `course-${Date.now()}`,
+      title: params.title,
+      description: params.description || '',
+      totalSessions: params.totalSessions,
+      defaultVenueCost: params.defaultVenueCost ?? 2000,
+      defaultTeacherFee: params.defaultTeacherFee ?? 1200,
+      defaultFeePerStudent: params.defaultFeePerStudent ?? 500,
+      minThreshold: params.minThreshold ?? 4,
+      status: 'active',
+      startDate: params.startDate,
+      endDate: params.endDate
+    };
+
+    this.courses.set([...this.courses(), newCourse]);
+    this.selectedCourseId.set(newCourse.id);
+    return newCourse;
+  }
+
+  // 切換當前選取的期班課程
+  setSelectedCourse(courseId: string): void {
+    this.selectedCourseId.set(courseId);
+    const courseSessions = this.sessions()
+      .filter(s => s.courseId === courseId)
+      .sort((a, b) => (a.sessionIndex ?? 0) - (b.sessionIndex ?? 0) || a.date.localeCompare(b.date));
+
+    if (courseSessions.length > 0) {
+      const current = this.currentSession();
+      if (!current || current.courseId !== courseId) {
+        // 優先切換至尚未結束（scheduled）的課堂，若皆已結束或取消則回退至第一堂課
+        const nextTargetSession = courseSessions.find(s => s.status === 'scheduled') || courseSessions[0];
+        this.setSelectedSession(nextTargetSession.id);
+      }
+    }
+  }
+
+  // 為指定期班新增課堂
+  addSessionToCourse(
+    courseId: string,
+    params: Partial<CreateClassSessionParams> & { date: string; title?: string }
+  ): ClassSession {
+    const course = this.courses().find(c => c.id === courseId);
+    const existingSessions = this.sessions().filter(s => s.courseId === courseId);
+    const sessionIndex = params.sessionIndex ?? (existingSessions.length + 1);
+
+    const title = params.title || (course ? `${course.title} (第 ${sessionIndex} 堂)` : `第 ${sessionIndex} 堂課`);
+    const venueCost = params.venueCost ?? course?.defaultVenueCost ?? 2000;
+    const teacherFee = params.teacherFee ?? course?.defaultTeacherFee ?? 1200;
+    const feePerStudent = params.feePerStudent ?? course?.defaultFeePerStudent ?? 500;
+    const minThreshold = params.minThreshold ?? course?.minThreshold ?? 4;
+
+    return this.createSession({
+      courseId,
+      sessionIndex,
+      title,
+      date: params.date,
+      dayOfWeek: params.dayOfWeek,
+      startTime: params.startTime || '14:00',
+      endTime: params.endTime || '15:30',
+      venueName: params.venueName || '敦南日光舞蹈排練室 A 廳',
+      venueCost,
+      teacherFee,
+      otherCost: params.otherCost ?? 0,
+      feePerStudent,
+      maxCapacity: params.maxCapacity ?? 10,
+      minThreshold
+    });
+  }
+
+  // 取得特定學員在指定課程中的進度與出勤明細
+  getStudentCourseProgress(studentId: string, courseId?: string): StudentCourseProgress | null {
+    const targetCourseId = courseId || this.selectedCourseId();
+    const course = this.courses().find(c => c.id === targetCourseId);
+    if (!course) return null;
+    const stu = this.students().find(s => s.id === studentId);
+    if (!stu) return null;
+
+    const sessions = this.sessions()
+      .filter(s => s.courseId === course.id)
+      .sort((a, b) => (a.sessionIndex ?? 0) - (b.sessionIndex ?? 0) || a.date.localeCompare(b.date));
+    const allAttendance = this.attendance();
+
+    let attendedCount = 0;
+    let leaveCount = 0;
+    let absentCount = 0;
+    let registeredCount = 0;
+
+    const sessionDetails: StudentCourseSessionDetail[] = sessions.map((s, idx) => {
+      const rec = allAttendance.find(a => a.sessionId === s.id && a.studentId === stu.id);
+      const sessionIndex = s.sessionIndex ?? (idx + 1);
+      if (!rec) {
+        return {
+          sessionId: s.id,
+          sessionIndex,
+          date: s.date,
+          status: 'unregistered' as const
+        };
+      }
+
+      if (rec.status === 'attended') attendedCount++;
+      else if (rec.status === 'leave_advance' || rec.status === 'leave_late') leaveCount++;
+      else if (rec.status === 'absent') absentCount++;
+      else if (rec.status === 'registered') registeredCount++;
+
+      return {
+        sessionId: s.id,
+        sessionIndex,
+        date: s.date,
+        status: rec.status,
+        signedAt: rec.signedAt
+      };
+    });
+
+    const totalCourseSessions = course.totalSessions || (sessions.length > 0 ? sessions.length : 1);
+    const attendanceRate = totalCourseSessions > 0
+      ? Math.round((attendedCount / totalCourseSessions) * 100)
+      : 0;
+
+    return {
+      studentId: stu.id,
+      studentName: stu.name,
+      attendedCount,
+      leaveCount,
+      absentCount,
+      registeredCount,
+      totalCourseSessions,
+      attendanceRate,
+      sessionDetails
+    };
+  }
+
   // 建立新課堂班次
   createSession(sessionData: CreateClassSessionParams): ClassSession {
     const days = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
     const d = new Date(`${sessionData.date}T00:00:00`);
     const dayOfWeek = sessionData.dayOfWeek || (!isNaN(d.getDay()) ? days[d.getDay()] : '週六');
 
+    const course = sessionData.courseId ? this.courses().find(c => c.id === sessionData.courseId) : undefined;
+    const sessionIndex = sessionData.sessionIndex || (sessionData.courseId ? this.sessions().filter(s => s.courseId === sessionData.courseId).length + 1 : 1);
+    const sessionTitle = sessionData.title || (course ? `${course.title} (第 ${sessionIndex} 堂)` : `芭蕾課堂 (第 ${sessionIndex} 堂)`);
+
     const newSession: ClassSession = {
       id: `session-${sessionData.date}-${Date.now().toString().slice(-4)}`,
+      courseId: sessionData.courseId,
+      sessionIndex,
       date: sessionData.date,
       dayOfWeek,
       startTime: sessionData.startTime,
       endTime: sessionData.endTime,
-      title: sessionData.title,
+      title: sessionTitle,
       venueName: sessionData.venueName,
       venueCost: sessionData.venueCost ?? 2000,
+      teacherFee: sessionData.teacherFee ?? 1200,
+      otherCost: sessionData.otherCost ?? 0,
       feePerStudent: sessionData.feePerStudent ?? 500,
       maxCapacity: sessionData.maxCapacity ?? 10,
       minThreshold: sessionData.minThreshold ?? 4,
@@ -876,6 +1210,10 @@ export class BalletStateService {
 
     this.sessions.set([newSession, ...this.sessions()]);
     this.selectedSessionId.set(newSession.id);
+
+    if (newSession.courseId) {
+      this.selectedCourseId.set(newSession.courseId);
+    }
 
     // 背景非同步同步至後端 API
     if (this.api?.isAvailable) {
@@ -893,6 +1231,11 @@ export class BalletStateService {
   // 切換當前選定的課堂
   setSelectedSession(sessionId: string): void {
     this.selectedSessionId.set(sessionId);
+    const session = this.sessions().find(s => s.id === sessionId);
+    if (session?.courseId) {
+      this.selectedCourseId.set(session.courseId);
+    }
+
     if (this.api?.isAvailable) {
       this.api.getSessionAttendance(sessionId).pipe(catchError(() => of([]))).subscribe(records => {
         if (records && records.length > 0) {
@@ -943,11 +1286,47 @@ export class BalletStateService {
   }
 
   private loadInitialData() {
+    // 預設期班課程
+    const initialCourses: Course[] = [
+      {
+        id: 'course-1',
+        title: '成人優雅芭蕾美姿體雕班 (秋季初階期班)',
+        description: '專為初學者量身打造，結合芭蕾核心體態雕塑與優雅身形延展。',
+        totalSessions: 8,
+        defaultVenueCost: 2000,
+        defaultTeacherFee: 1200,
+        defaultFeePerStudent: 500,
+        minThreshold: 4,
+        status: 'active',
+        startDate: '2026-09-12',
+        endDate: '2026-10-31'
+      },
+      {
+        id: 'course-2',
+        title: '成人芭蕾足尖技巧進階班 (週四夜間期班)',
+        description: '針對具備基礎學員，深入訓練腳踝足弓肌力與足尖平穩度。',
+        totalSessions: 6,
+        defaultVenueCost: 2000,
+        defaultTeacherFee: 1200,
+        defaultFeePerStudent: 550,
+        minThreshold: 4,
+        status: 'active',
+        startDate: '2026-09-17',
+        endDate: '2026-10-22'
+      }
+    ];
+
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (parsed.students && parsed.sessions) {
+          if (parsed.courses && parsed.courses.length > 0) {
+            this.courses.set(parsed.courses);
+          } else {
+            this.courses.set(initialCourses);
+          }
+          this.selectedCourseId.set(parsed.selectedCourseId || 'course-1');
           this.students.set(parsed.students);
           this.ticketPacks.set(parsed.ticketPacks);
           this.sessions.set(parsed.sessions);
@@ -990,17 +1369,21 @@ export class BalletStateService {
       { id: 'pack-10', studentId: 'stu-10', type: '5_class', totalCount: 5, remainingCount: 4, purchaseDate: '2026-08-25', expiryDate: '2026-11-05', status: 'active', pricePaid: 2500 }
     ];
 
-    // 週六課程
+    // 多堂課班次 (涵蓋 course-1 與 course-2)
     const initialSessions: ClassSession[] = [
       {
         id: 'session-upcoming',
+        courseId: 'course-1',
+        sessionIndex: 2,
         date: '2026-09-19',
         dayOfWeek: '週六',
         startTime: '14:00',
         endTime: '15:30',
-        title: '成人優雅芭蕾美姿體雕班',
+        title: '成人優雅芭蕾美姿體雕班 (第 2 堂)',
         venueName: '敦南日光舞蹈排練室 A 廳',
         venueCost: 2000,
+        teacherFee: 1200,
+        otherCost: 0,
         feePerStudent: 500,
         maxCapacity: 10,
         minThreshold: 4,
@@ -1008,27 +1391,95 @@ export class BalletStateService {
       },
       {
         id: 'session-prev',
+        courseId: 'course-1',
+        sessionIndex: 1,
         date: '2026-09-12',
         dayOfWeek: '週六',
         startTime: '14:00',
         endTime: '15:30',
-        title: '成人優雅芭蕾美姿體雕班',
+        title: '成人優雅芭蕾美姿體雕班 (第 1 堂)',
         venueName: '敦南日光舞蹈排練室 A 廳',
         venueCost: 2000,
+        teacherFee: 1200,
+        otherCost: 0,
         feePerStudent: 500,
         maxCapacity: 10,
         minThreshold: 4,
         status: 'completed'
+      },
+      {
+        id: 'session-course-1-3',
+        courseId: 'course-1',
+        sessionIndex: 3,
+        date: '2026-09-26',
+        dayOfWeek: '週六',
+        startTime: '14:00',
+        endTime: '15:30',
+        title: '成人優雅芭蕾美姿體雕班 (第 3 堂)',
+        venueName: '敦南日光舞蹈排練室 A 廳',
+        venueCost: 2000,
+        teacherFee: 1200,
+        otherCost: 0,
+        feePerStudent: 500,
+        maxCapacity: 10,
+        minThreshold: 4,
+        status: 'scheduled'
+      },
+      {
+        id: 'session-course-2-1',
+        courseId: 'course-2',
+        sessionIndex: 1,
+        date: '2026-09-17',
+        dayOfWeek: '週四',
+        startTime: '19:30',
+        endTime: '21:00',
+        title: '成人芭蕾足尖技巧進階班 (第 1 堂)',
+        venueName: '敦南日光舞蹈排練室 B 廳',
+        venueCost: 2000,
+        teacherFee: 1200,
+        otherCost: 0,
+        feePerStudent: 550,
+        maxCapacity: 10,
+        minThreshold: 4,
+        status: 'completed'
+      },
+      {
+        id: 'session-course-2-2',
+        courseId: 'course-2',
+        sessionIndex: 2,
+        date: '2026-09-24',
+        dayOfWeek: '週四',
+        startTime: '19:30',
+        endTime: '21:00',
+        title: '成人芭蕾足尖技巧進階班 (第 2 堂)',
+        venueName: '敦南日光舞蹈排練室 B 廳',
+        venueCost: 2000,
+        teacherFee: 1200,
+        otherCost: 0,
+        feePerStudent: 550,
+        maxCapacity: 10,
+        minThreshold: 4,
+        status: 'scheduled'
       }
     ];
 
     // 初始出勤展示：
-    // stu-1 陳秀琴: 已手寫簽名簽到
-    // stu-2 王美玲: 已在 24h 前請假 (保留堂數)
-    // 其餘學員: registered (預約應到，待 iPad 現場手寫簽到)
     const sampleSignatureSvg = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="80"><path d="M20,50 Q60,10 90,45 T170,30" fill="none" stroke="%231a365d" stroke-width="4" stroke-linecap="round"/></svg>';
 
     const initialAttendance: AttendanceRecord[] = [
+      // 第 1 堂已完成課堂出勤
+      ...initialStudents.slice(0, 8).map((s, idx) => ({
+        id: `att-prev-${s.id}`,
+        sessionId: 'session-prev',
+        studentId: s.id,
+        studentName: s.name,
+        status: 'attended' as const,
+        signatureDataUrl: sampleSignatureSvg,
+        signedAt: `13:5${idx}:10`,
+        deductedCount: 1,
+        remark: '首堂課完成簽名出席'
+      })),
+      // 第 2 堂課出勤
       {
         id: 'att-upcoming-stu-1',
         sessionId: 'session-upcoming',
@@ -1061,6 +1512,8 @@ export class BalletStateService {
       }))
     ];
 
+    this.courses.set(initialCourses);
+    this.selectedCourseId.set('course-1');
     this.students.set(initialStudents);
     this.ticketPacks.set(initialPacks);
     this.sessions.set(initialSessions);

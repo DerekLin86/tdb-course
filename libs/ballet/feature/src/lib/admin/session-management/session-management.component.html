@@ -10,30 +10,57 @@
     </div>
 
     <div class="header-controls">
+      <!-- 課程期班切換下拉選單 -->
+      <div class="session-selector-group">
+        <label for="courseSelect" class="selector-label">期班課程：</label>
+        <select
+          id="courseSelect"
+          class="session-select"
+          [ngModel]="currentCourse()?.id"
+          (ngModelChange)="handleSelectCourse($event)"
+        >
+          @for (c of courses(); track c.id) {
+            <option [value]="c.id">{{ c.title }}</option>
+          }
+        </select>
+      </div>
+
       <!-- 課堂切換下拉選單 -->
       <div class="session-selector-group">
-        <label for="sessionSelect" class="selector-label">課堂選單：</label>
+        <label for="sessionSelect" class="selector-label">課堂堂數：</label>
         <select
           id="sessionSelect"
           class="session-select"
           [ngModel]="session()?.id"
           (ngModelChange)="handleSelectSession($event)"
         >
-          @for (s of allSessions(); track s.id) {
-            <option [value]="s.id">
-              {{ s.date }} ({{ s.dayOfWeek }}) · {{ s.title }} {{ s.status === 'cancelled' ? '【已順延】' : '' }}
-            </option>
+          @if (courseSessions().length === 0) {
+            <option value="" disabled selected>本期班尚無排定課堂，請點擊「排定新課堂」</option>
+          } @else {
+            @for (s of courseSessions(); track s.id) {
+              <option [value]="s.id">
+                {{ s.sessionIndex ? '第 ' + s.sessionIndex + ' 堂 · ' : '' }}{{ s.date }} ({{ s.dayOfWeek }}) {{ s.startTime }}~{{ s.endTime }}{{ s.status === 'cancelled' ? ' 【已順延】' : '' }}
+              </option>
+            }
           }
         </select>
       </div>
 
-      <!-- 建立新課程按鈕 -->
+      <!-- 建立新期班與排定課堂按鈕群 -->
+      <button
+        type="button"
+        class="btn-create-course"
+        (click)="openCreateCourseModal()"
+      >
+        <span class="btn-icon">＋</span> 建立新期班
+      </button>
+
       <button
         type="button"
         class="btn-create-session"
-        (click)="openCreateModal()"
+        (click)="openCreateSessionModal()"
       >
-        <span class="btn-icon">＋</span> 建立新課程
+        <span class="btn-icon">＋</span> 排定新課堂
       </button>
 
       <div class="session-status-tag">
@@ -46,13 +73,70 @@
     </div>
   </header>
 
-  <!-- 核心區一：開班門檻與場租損益防護監控看板 -->
+  <!-- 全期課程總體財務與營運統計看板 -->
+  <section class="course-financial-card">
+    <div class="guard-header">
+      <div class="guard-title-group">
+        <div>
+          <span class="section-badge">COURSE OVERVIEW · 全期營運統計</span>
+          <h2 class="guard-title">{{ courseFinancials().courseTitle }}</h2>
+          <p class="guard-sub">全期規劃 {{ courseFinancials().totalSessions }} 堂 ｜ 已完成 {{ courseFinancials().completedSessions }} 堂 ｜ 進行與排定中 {{ courseFinancials().scheduledSessions }} 堂</p>
+        </div>
+      </div>
+      <div class="course-rate-badge">
+        <span class="rate-label">全期平均出席率</span>
+        <span class="rate-value">{{ courseFinancials().averageAttendanceRate }}%</span>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-box">
+        <span class="kpi-label">全期總營運成本</span>
+        <div class="kpi-value">
+          <strong>${{ courseFinancials().totalCost }}</strong>
+        </div>
+        <span class="kpi-note">場租 ${{ courseFinancials().totalVenueCost }} ＋ 師資 ${{ courseFinancials().totalTeacherFee }}</span>
+      </div>
+
+      <div class="kpi-box">
+        <span class="kpi-label">全期有效計費營收</span>
+        <div class="kpi-value">
+          <strong class="text-revenue">${{ courseFinancials().totalRevenue }}</strong>
+        </div>
+        <span class="kpi-note">折合學員票卡扣課堂數收入</span>
+      </div>
+
+      <div class="kpi-box">
+        <span class="kpi-label">全期累積淨收益 / 結餘</span>
+        <div class="kpi-value">
+          <strong
+            [class.text-profit]="courseFinancials().accumulatedNetProfit >= 0"
+            [class.text-loss]="courseFinancials().accumulatedNetProfit < 0"
+          >
+            {{ courseFinancials().accumulatedNetProfit >= 0 ? '+' : '' }}${{ courseFinancials().accumulatedNetProfit }}
+          </strong>
+        </div>
+        <span class="kpi-note">{{ courseFinancials().accumulatedNetProfit >= 0 ? '全期營運穩健盈餘' : '全期處於成本投入階段' }}</span>
+      </div>
+
+      <div class="kpi-box">
+        <span class="kpi-label">課堂開班進度</span>
+        <div class="kpi-value">
+          <strong>{{ courseFinancials().completedSessions }}</strong>
+          <span class="kpi-sub">/ {{ courseFinancials().totalSessions }} 堂</span>
+        </div>
+        <span class="kpi-note">尚餘 {{ courseFinancials().totalSessions - courseFinancials().completedSessions }} 堂排程</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 核心區一：開班門檻與單堂成本損益防護監控看板 -->
   <section class="financial-guard-card">
     <div class="guard-header">
       <div class="guard-title-group">
         <div>
-          <h2 class="guard-title">場租防虧損與開班門檻監控</h2>
-          <p class="guard-sub">固定場租 ${{ financials().venueCost }} / 場 ｜ 每人每堂學費折合 ${{ session().feePerStudent }}</p>
+          <h2 class="guard-title">場租防虧損與開班門檻監控（當前課堂）</h2>
+          <p class="guard-sub">場租 ${{ financials().venueCost }} ＋ 師資 ${{ financials().teacherFee }} ＝ 總成本 ${{ financials().totalCost }} / 場 ｜ 每堂學費折合 ${{ session().feePerStudent }}</p>
         </div>
       </div>
 
@@ -64,7 +148,7 @@
       >
         <span class="light-dot"></span>
         <span class="indicator-text">
-          {{ financials().isAtRisk ? '虧損警戒：未達開班人數門檻' : '營運安全：已達損益平衡門檻' }}
+          {{ financials().isAtRisk ? '虧損警戒：未達開班人數門檻' : '營運安全：已達開班門檻' }}
         </span>
       </div>
     </div>
@@ -79,7 +163,7 @@
           </strong>
           <span class="kpi-sub">/ {{ financials().totalCapacity }} 人滿班</span>
         </div>
-        <span class="kpi-note">最低開班門檻：{{ financials().minThreshold }} 人</span>
+        <span class="kpi-note">最低門檻 {{ financials().minThreshold }} 人 ｜ 損益平衡 {{ financials().breakEvenAttendees }} 人</span>
       </div>
 
       <div class="kpi-box">
@@ -98,7 +182,7 @@
         <div class="kpi-value">
           <strong class="text-revenue">${{ financials().effectiveRevenue }}</strong>
         </div>
-        <span class="kpi-note">場租成本 ${{ financials().venueCost }}</span>
+        <span class="kpi-note">總成本 ${{ financials().totalCost }} (場租${{ financials().venueCost }} + 師資${{ financials().teacherFee }})</span>
       </div>
 
       <div class="kpi-box">
@@ -123,7 +207,7 @@
         <div class="risk-info">
           <div>
             <strong>因請假人數過多，目前僅 {{ financials().expectedAttendees }} 人出席</strong>
-            <p>未達最低 {{ financials().minThreshold }} 人損益平衡門檻，開班將倒貼場租 ${{ Math.abs(financials().estimatedNetProfit) }} 元。</p>
+            <p>未達最低 {{ financials().minThreshold }} 人開班門檻，開班結餘倒貼 ${{ Math.abs(financials().estimatedNetProfit) }} 元。</p>
           </div>
         </div>
         <button
@@ -290,23 +374,154 @@
     </div>
   }
 
-  <!-- 建立新課程彈窗 Modal -->
-  @if (showCreateModal()) {
-    <div class="modal-backdrop" (click)="closeCreateModal()">
+  <!-- 建立新期班彈窗 Modal -->
+  @if (showCreateCourseModal()) {
+    <div class="modal-backdrop" (click)="closeCreateCourseModal()">
+      <div class="session-form-card" (click)="$event.stopPropagation()">
+        <header class="form-card-header">
+          <div>
+            <span class="modal-prefix">NEW COURSE · 新增期班</span>
+            <h3>建立新期班課程</h3>
+            <p>設定新期班基本資訊、全期總堂數與預設營運財務參數</p>
+          </div>
+          <button type="button" class="close-btn" (click)="closeCreateCourseModal()">✕</button>
+        </header>
+
+        <div class="form-card-body">
+          @if (createCourseError()) {
+            <div class="form-error-alert">
+              {{ createCourseError() }}
+            </div>
+          }
+
+          <div class="form-section">
+            <h4 class="form-section-title">期班課程基本資料</h4>
+
+            <div class="form-group">
+              <label for="newCourseTitle" class="form-label">期班課程名稱 <span class="required">*</span></label>
+              <input
+                id="newCourseTitle"
+                type="text"
+                class="form-input"
+                placeholder="例如：成人優雅芭蕾美姿體雕班 (冬季期班)"
+                [ngModel]="newCourseTitle()"
+                (ngModelChange)="newCourseTitle.set($event)"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="newCourseDescription" class="form-label">課程說明與簡介</label>
+              <input
+                id="newCourseDescription"
+                type="text"
+                class="form-input"
+                placeholder="例如：針對初學者設計，著重基礎體態雕塑與舞姿伸展"
+                [ngModel]="newCourseDescription()"
+                (ngModelChange)="newCourseDescription.set($event)"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="newCourseTotalSessions" class="form-label">全期規劃總堂數 <span class="required">*</span></label>
+              <input
+                id="newCourseTotalSessions"
+                type="number"
+                class="form-input"
+                min="1"
+                max="50"
+                [ngModel]="newCourseTotalSessions()"
+                (ngModelChange)="newCourseTotalSessions.set($event)"
+              />
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4 class="form-section-title">每堂預設成本與開班損益參數</h4>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="newCourseDefaultVenueCost" class="form-label">預設單堂場租 (NT$) <span class="required">*</span></label>
+                <input
+                  id="newCourseDefaultVenueCost"
+                  type="number"
+                  class="form-input"
+                  min="0"
+                  step="100"
+                  [ngModel]="newCourseDefaultVenueCost()"
+                  (ngModelChange)="newCourseDefaultVenueCost.set($event)"
+                />
+              </div>
+              <div class="form-group flex-1">
+                <label for="newCourseDefaultTeacherFee" class="form-label">預設單堂師資鐘點 (NT$) <span class="required">*</span></label>
+                <input
+                  id="newCourseDefaultTeacherFee"
+                  type="number"
+                  class="form-input"
+                  min="0"
+                  step="100"
+                  [ngModel]="newCourseDefaultTeacherFee()"
+                  (ngModelChange)="newCourseDefaultTeacherFee.set($event)"
+                />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="newCourseDefaultFeePerStudent" class="form-label">每人每堂折合學費 (NT$) <span class="required">*</span></label>
+                <input
+                  id="newCourseDefaultFeePerStudent"
+                  type="number"
+                  class="form-input"
+                  min="0"
+                  step="50"
+                  [ngModel]="newCourseDefaultFeePerStudent()"
+                  (ngModelChange)="newCourseDefaultFeePerStudent.set($event)"
+                />
+              </div>
+              <div class="form-group flex-1">
+                <label for="newCourseMinThreshold" class="form-label">預設開班防虧門檻 (人) <span class="required">*</span></label>
+                <input
+                  id="newCourseMinThreshold"
+                  type="number"
+                  class="form-input"
+                  min="1"
+                  max="50"
+                  [ngModel]="newCourseMinThreshold()"
+                  (ngModelChange)="newCourseMinThreshold.set($event)"
+                />
+              </div>
+            </div>
+            <p class="form-tip">
+              此處設定之成本與門檻數值將作為後續排定此期班各課堂時的預設連動值。
+            </p>
+          </div>
+        </div>
+
+        <footer class="form-card-footer">
+          <button type="button" class="btn-cancel" (click)="closeCreateCourseModal()">取消</button>
+          <button type="button" class="btn-submit" (click)="submitCreateCourse()">確認建立期班</button>
+        </footer>
+      </div>
+    </div>
+  }
+
+  <!-- 排定新課堂彈窗 Modal -->
+  @if (showCreateSessionModal()) {
+    <div class="modal-backdrop" (click)="closeCreateSessionModal()">
       <div class="session-form-card" (click)="$event.stopPropagation()">
         <header class="form-card-header">
           <div>
             <span class="modal-prefix">NEW SCHEDULE · 排定班次</span>
-            <h3>建立新課堂班次</h3>
-            <p>排定新的成人芭蕾課堂並設定開班門檻與場租損益參數</p>
+            <h3>排定新課堂班次</h3>
+            <p>排定新的課堂並連動期班損益防護與場租參數</p>
           </div>
-          <button type="button" class="close-btn" (click)="closeCreateModal()">✕</button>
+          <button type="button" class="close-btn" (click)="closeCreateSessionModal()">✕</button>
         </header>
 
         <div class="form-card-body">
-          @if (createFormError()) {
+          @if (createSessionError()) {
             <div class="form-error-alert">
-              {{ createFormError() }}
+              {{ createSessionError() }}
             </div>
           }
 
@@ -314,15 +529,17 @@
             <h4 class="form-section-title">課堂基本資料</h4>
 
             <div class="form-group">
-              <label for="newSessionTitle" class="form-label">課程名稱 <span class="required">*</span></label>
-              <input
-                id="newSessionTitle"
-                type="text"
+              <label for="newSessionCourse" class="form-label">所屬期班課程 <span class="required">*</span></label>
+              <select
+                id="newSessionCourse"
                 class="form-input"
-                placeholder="例如：成人優雅芭蕾美姿體雕班"
-                [ngModel]="newSessionTitle()"
-                (ngModelChange)="newSessionTitle.set($event)"
-              />
+                [ngModel]="newSessionCourseId()"
+                (ngModelChange)="onCourseSelectInCreateSession($event)"
+              >
+                @for (c of courses(); track c.id) {
+                  <option [value]="c.id">{{ c.title }}</option>
+                }
+              </select>
             </div>
 
             <div class="form-row">
@@ -382,7 +599,7 @@
           </div>
 
           <div class="form-section">
-            <h4 class="form-section-title">場租損益與開班門檻</h4>
+            <h4 class="form-section-title">成本結構與開班損益門檻</h4>
 
             <div class="form-row">
               <div class="form-group flex-1">
@@ -395,6 +612,33 @@
                   step="100"
                   [ngModel]="newSessionVenueCost()"
                   (ngModelChange)="newSessionVenueCost.set($event)"
+                />
+              </div>
+              <div class="form-group flex-1">
+                <label for="newSessionTeacherFee" class="form-label">師資鐘點費 (NT$) <span class="required">*</span></label>
+                <input
+                  id="newSessionTeacherFee"
+                  type="number"
+                  class="form-input"
+                  min="0"
+                  step="100"
+                  [ngModel]="newSessionTeacherFee()"
+                  (ngModelChange)="newSessionTeacherFee.set($event)"
+                />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="newSessionOtherCost" class="form-label">其他雜支成本 (NT$)</label>
+                <input
+                  id="newSessionOtherCost"
+                  type="number"
+                  class="form-input"
+                  min="0"
+                  step="50"
+                  [ngModel]="newSessionOtherCost()"
+                  (ngModelChange)="newSessionOtherCost.set($event)"
                 />
               </div>
               <div class="form-group flex-1">
@@ -438,14 +682,14 @@
               </div>
             </div>
             <p class="form-tip">
-              防虧損機制：開課前出席人數若少於 {{ newSessionMinThreshold() }} 人，系統將觸發虧損警示，並支援老師一鍵順延停課以保護場租不倒貼。
+              防虧損機制：開課前出席人數若少於 {{ newSessionMinThreshold() }} 人，系統將觸發虧損警示，並支援老師一鍵順延停課以保護場租與師資成本不倒貼。
             </p>
           </div>
         </div>
 
         <footer class="form-card-footer">
-          <button type="button" class="btn-cancel" (click)="closeCreateModal()">取消</button>
-          <button type="button" class="btn-submit" (click)="submitCreateSession()">確認建立課堂</button>
+          <button type="button" class="btn-cancel" (click)="closeCreateSessionModal()">取消</button>
+          <button type="button" class="btn-submit" (click)="submitCreateSession()">確認排定課堂</button>
         </footer>
       </div>
     </div>

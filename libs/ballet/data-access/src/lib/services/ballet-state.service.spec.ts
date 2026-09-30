@@ -165,6 +165,23 @@ describe('BalletStateService (防虧損與出缺勤業務邏輯測試 - 單機�
     expect(service.currentSession()?.id).toBe('session-upcoming');
   });
 
+  it('建立新課堂時若未提供 title，應自動依期班名稱與堂數序號生成課堂標題', () => {
+    const course = service.courses()[0];
+    const existingCount = service.sessions().filter(s => s.courseId === course.id).length;
+    const nextIndex = existingCount + 1;
+
+    const newSession = service.createSession({
+      courseId: course.id,
+      date: '2026-10-10',
+      startTime: '14:00',
+      endTime: '15:30',
+      venueName: '台北敦南教室 A 廳'
+    });
+
+    expect(newSession.title).toBe(`${course.title} (第 ${nextIndex} 堂)`);
+    expect(newSession.sessionIndex).toBe(nextIndex);
+  });
+
   it('建立新課堂時，不應自動匯入任何學員 (名冊初始為空)', () => {
     const newSession = service.createSession({
       title: '週四成人芭蕾新開班',
@@ -745,4 +762,153 @@ describe('BalletStateService (後端 API 整合與非同步同步機制)', () =>
     expect(service.hasPurchasedTrial('stu-1')).toBeTrue();
   });
 });
+
+describe('【多堂課課程關聯、全期財務損益與學員出勤進度】', () => {
+  let service: BalletStateService;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(BalletStateService);
+    service.resetMockData();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('應正確載入預設 2 個期班課程及各堂課關聯，並設定預設當前選定課程', () => {
+    expect(service.courses().length).toBe(2);
+    expect(service.selectedCourseId()).toBe('course-1');
+    expect(service.currentCourse()).toBeTruthy();
+    expect(service.currentCourse()?.id).toBe('course-1');
+    expect(service.currentCourse()?.totalSessions).toBe(8);
+
+    const sessions = service.currentCourseSessions();
+    expect(sessions.length).toBe(3);
+    for (const s of sessions) {
+      expect(s.courseId).toBe('course-1');
+    }
+  });
+
+  it('createCourse() 應成功建立新期班並切換為當前課程', () => {
+    const initialCount = service.courses().length;
+    const newCourse = service.createCourse({
+      title: '成人足尖技巧專班 (冬季班)',
+      description: '冬季進階特別訓練',
+      totalSessions: 10,
+      defaultVenueCost: 2500,
+      defaultTeacherFee: 1500,
+      defaultFeePerStudent: 600,
+      minThreshold: 5
+    });
+
+    expect(service.courses().length).toBe(initialCount + 1);
+    expect(newCourse.title).toBe('成人足尖技巧專班 (冬季班)');
+    expect(newCourse.defaultVenueCost).toBe(2500);
+    expect(newCourse.defaultTeacherFee).toBe(1500);
+    expect(service.selectedCourseId()).toBe(newCourse.id);
+    expect(service.currentCourse()?.id).toBe(newCourse.id);
+  });
+
+  it('addSessionToCourse() 應依期班預設成本與堂數序號建立課堂並與期班關聯', () => {
+    const courseId = 'course-1';
+    const newSession = service.addSessionToCourse(courseId, {
+      date: '2026-10-03',
+      startTime: '14:00',
+      endTime: '15:30'
+    });
+
+    expect(newSession.courseId).toBe(courseId);
+    expect(newSession.sessionIndex).toBe(4);
+    expect(newSession.venueCost).toBe(2000);
+    expect(newSession.teacherFee).toBe(1200);
+    expect(newSession.feePerStudent).toBe(500);
+    expect(newSession.minThreshold).toBe(4);
+    expect(service.currentCourseSessions().some(s => s.id === newSession.id)).toBeTrue();
+  });
+
+  it('setSelectedCourse() 切換期班時應連動更新 currentCourse 與 currentCourseSessions，並優先選取尚未結束（scheduled）之課堂', () => {
+    service.setSelectedCourse('course-2');
+    expect(service.selectedCourseId()).toBe('course-2');
+    expect(service.currentCourse()?.id).toBe('course-2');
+    expect(service.currentCourse()?.title).toContain('足尖技巧進階班');
+
+    const course2Sessions = service.currentCourseSessions();
+    expect(course2Sessions.length).toBe(2);
+    expect(service.currentSession()?.courseId).toBe('course-2');
+    // course-2 第一堂課已完成 (completed)，第二堂課未結束 (scheduled)，應優先選取第二堂課
+    expect(service.currentSession()?.id).toBe('session-course-2-2');
+    expect(service.currentSession()?.status).toBe('scheduled');
+  });
+
+  it('setSelectedCourse() 當目標期班所有課堂皆非 scheduled 狀態時應回退選取第一堂課', () => {
+    // 將 course-2 僅存的 scheduled 課堂改為 cancelled
+    service.cancelSessionDueToThreshold('session-course-2-2');
+
+    // 先切回 course-1
+    service.setSelectedCourse('course-1');
+    expect(service.selectedCourseId()).toBe('course-1');
+
+    // 再切到 course-2，此時無 scheduled 課堂，應回退至第一堂課
+    service.setSelectedCourse('course-2');
+    expect(service.currentSession()?.id).toBe('session-course-2-1');
+  });
+
+  it('currentCourseFinancials 應準確匯總全期場租、師資鐘點費、總成本、總營收與累積淨結餘', () => {
+    service.setSelectedCourse('course-1');
+    const financials = service.currentCourseFinancials();
+
+    expect(financials.courseId).toBe('course-1');
+    expect(financials.totalSessions).toBe(8);
+    expect(financials.completedSessions).toBe(1); // session-prev
+    expect(financials.scheduledSessions).toBe(2); // session-upcoming, session-course-1-3
+
+    // 成本驗證: 3堂課 * (2000場租 + 1200師資) = 9600
+    expect(financials.totalVenueCost).toBe(6000);
+    expect(financials.totalTeacherFee).toBe(3600);
+    expect(financials.totalOtherCost).toBe(0);
+    expect(financials.totalCost).toBe(9600);
+
+    // 營收與結餘均應為正值
+    expect(financials.totalRevenue).toBeGreaterThan(0);
+    expect(financials.accumulatedNetProfit).toBe(financials.totalRevenue - financials.totalCost);
+    expect(financials.averageAttendanceRate).toBeGreaterThanOrEqual(0);
+    expect(financials.averageAttendanceRate).toBeLessThanOrEqual(100);
+  });
+
+  it('currentCourseStudentProgress 應精確追蹤學員在各堂課的出席狀態、出勤堂數與出勤率百分比', () => {
+    service.setSelectedCourse('course-1');
+    const progressList = service.currentCourseStudentProgress();
+
+    expect(progressList.length).toBe(10);
+
+    // stu-1 (陳秀琴) 在 session-prev 與 session-upcoming 皆出席
+    const stu1Progress = progressList.find(p => p.studentId === 'stu-1');
+    expect(stu1Progress).toBeTruthy();
+    expect(stu1Progress!.attendedCount).toBe(2);
+    expect(stu1Progress!.totalCourseSessions).toBe(8);
+    expect(stu1Progress!.attendanceRate).toBe(25); // 2 / 8 * 100% = 25%
+    expect(stu1Progress!.sessionDetails.length).toBe(3);
+
+    // getStudentCourseProgress 單獨查詢亦應回傳一致結果
+    const singleProgress = service.getStudentCourseProgress('stu-1', 'course-1');
+    expect(singleProgress).toEqual(stu1Progress!);
+  });
+
+  it('課堂停課順延時，全期財務統計應排除已取消課堂之成本與營收，保障損益計算準確', () => {
+    service.setSelectedCourse('course-1');
+    const beforeStats = service.currentCourseFinancials();
+
+    // 將 session-upcoming 順延停課 (退場租)
+    service.cancelSessionDueToThreshold('session-upcoming');
+
+    const afterStats = service.currentCourseFinancials();
+    // 應少一堂課的場租與師資成本 (2000 + 1200 = 3200)
+    expect(afterStats.totalCost).toBe(beforeStats.totalCost - 3200);
+    expect(afterStats.totalVenueCost).toBe(beforeStats.totalVenueCost - 2000);
+    expect(afterStats.totalTeacherFee).toBe(beforeStats.totalTeacherFee - 1200);
+  });
+});
+
 

@@ -147,7 +147,8 @@
 }
 
 .admin-header,
-.admin-table-card {
+.admin-table-card,
+.course-financial-card {
   background: #ffffff;
   border-radius: 24px;
   border: 1px solid #e7edf3;
@@ -220,6 +221,39 @@
     }
   }
 
+  .btn-create-course {
+    display: inline-flex;
+    align-items: center;
+    background: #ffffff;
+    color: #8e5b69;
+    border: 1.5px solid #d4b5bd;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(142, 91, 105, 0.08);
+    transition: all 0.2s ease;
+    gap: 0.4rem;
+    padding: 0.55rem 1.15rem;
+    border-radius: 14px;
+    font-size: 0.9rem;
+
+    .btn-icon {
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    &:hover {
+      background: #fdf8f9;
+      border-color: #8e5b69;
+      color: #784855;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(142, 91, 105, 0.15);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
+  }
+
   .btn-create-session {
     @extend %btn-berry-base;
     gap: 0.4rem;
@@ -272,6 +306,7 @@
       }
     }
 
+    .btn-create-course,
     .btn-create-session {
       justify-content: center;
       min-height: 44px;
@@ -283,19 +318,147 @@
   }
 }
 
+// --- 全期課程總體財務與營運統計看板 ---
+.course-financial-card {
+  padding: 1.15rem 1.35rem;
+
+  .guard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.85rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .section-badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #8e5b69;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.25rem;
+  }
+
+  .guard-title {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #263342;
+  }
+
+  .guard-sub {
+    margin: 0.25rem 0 0;
+    font-size: 0.88rem;
+    color: #7b8b9c;
+  }
+
+  .course-rate-badge {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    background: #fdf5f7;
+    border: 1px solid #fae8ec;
+    padding: 0.35rem 0.75rem;
+    border-radius: 16px;
+
+    .rate-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #8e5b69;
+    }
+
+    .rate-value {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #8e5b69;
+      line-height: 1.1;
+    }
+  }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.85rem;
+
+    @media (min-width: 768px) and (max-width: 1024px) {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+    }
+
+    @media (max-width: 767px) {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.6rem;
+    }
+  }
+
+  .kpi-box {
+    background: #f8fafc;
+    border-radius: 14px;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid #eef3f7;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+
+    .kpi-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #64748b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .kpi-value {
+      margin: 0.25rem 0 0.15rem;
+
+      strong {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: #263342;
+      }
+
+      .kpi-sub {
+        font-size: 0.88rem;
+        color: #8796a5;
+        margin-left: 0.25rem;
+      }
+
+      .text-revenue {
+        color: #8e5b69;
+      }
+
+      .text-profit {
+        color: #10b981;
+      }
+
+      .text-loss {
+        color: #ef4444;
+      }
+    }
+
+    .kpi-note {
+      font-size: 0.72rem;
+      line-height: 1.2;
+      color: #8796a5;
+    }
+  }
+}
+
 // --- 核心區一：開班門檻與場租損益防護看板 ---
 .financial-guard-card {
   background: #ffffff;
   border-radius: 24px;
   border: 1px solid #e7edf3;
-  padding: 1.75rem;
+  padding: 1.15rem 1.35rem;
   box-shadow: 0 10px 30px -5px rgba(50, 70, 90, 0.05);
 
   .guard-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: 0.85rem;
     flex-wrap: wrap;
     gap: 1rem;
   }
@@ -317,7 +480,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.6rem;
-    padding: 0.5rem 1rem;
+    padding: 0.4rem 0.85rem;
     border-radius: 20px;
     font-size: 0.85rem;
     font-weight: 600;
@@ -358,40 +521,43 @@
   .kpi-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 1.25rem;
-    margin-bottom: 1.5rem;
+    gap: 0.85rem;
+    margin-bottom: 1.25rem;
 
     @media (min-width: 768px) and (max-width: 1024px) {
       grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
+      gap: 0.75rem;
     }
 
     @media (max-width: 767px) {
-      grid-template-columns: 1fr;
-      gap: 0.75rem;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.6rem;
     }
   }
 
   .kpi-box {
     background: #f8fafc;
-    border-radius: 16px;
-    padding: 1.2rem;
+    border-radius: 14px;
+    padding: 0.75rem 0.85rem;
     border: 1px solid #eef3f7;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
 
     .kpi-label {
-      font-size: 0.82rem;
+      font-size: 0.75rem;
       font-weight: 600;
       color: #64748b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .kpi-value {
-      margin: 0.5rem 0 0.25rem;
+      margin: 0.25rem 0 0.15rem;
 
       strong {
-        font-size: 1.7rem;
+        font-size: 1.35rem;
         font-weight: 800;
         color: #263342;
       }
@@ -420,7 +586,8 @@
     }
 
     .kpi-note {
-      font-size: 0.78rem;
+      font-size: 0.72rem;
+      line-height: 1.2;
       color: #8796a5;
     }
   }

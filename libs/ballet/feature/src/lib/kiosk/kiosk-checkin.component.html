@@ -3,26 +3,48 @@
   <header class="hero-card">
     <h1 class="hero-title">Triple Dream<br>Ballet</h1>
     <p class="hero-tagline">Grace, Poise, Elegance.</p>
-    <div class="session-selector-container">
-      <label for="kiosk-session-select" class="sr-only">選擇課堂班次</label>
-      <div class="select-wrapper">
-        <select
-          id="kiosk-session-select"
-          class="session-select"
-          [value]="session().id"
-          (change)="onSessionChange($event)"
-        >
-          @for (s of availableSessions(); track s.id) {
-            <option [value]="s.id">
-              {{ s.date }} ({{ s.dayOfWeek }}) {{ s.startTime }}~{{ s.endTime }} - {{ s.title }}
-            </option>
-          }
-        </select>
-        <span class="select-arrow">▾</span>
+    <div class="session-selector-container kiosk-selectors-dual">
+      <div class="selector-field">
+        <label for="kiosk-course-select" class="selector-sublabel">期班課程：</label>
+        <div class="select-wrapper">
+          <select
+            id="kiosk-course-select"
+            class="session-select"
+            [value]="state.selectedCourseId()"
+            (change)="onCourseChange($event)"
+          >
+            @for (c of courses(); track c.id) {
+              <option [value]="c.id">{{ c.title }}</option>
+            }
+          </select>
+          <span class="select-arrow">▾</span>
+        </div>
+      </div>
+
+      <div class="selector-field">
+        <label for="kiosk-session-select" class="selector-sublabel">課堂堂數：</label>
+        <div class="select-wrapper">
+          <select
+            id="kiosk-session-select"
+            class="session-select"
+            [value]="session()?.id"
+            (change)="onSessionChange($event)"
+          >
+            @for (s of availableSessions(); track s.id) {
+              <option [value]="s.id">
+                第 {{ s.sessionIndex ?? '?' }} / {{ currentCourse()?.totalSessions ?? 8 }} 堂 · {{ s.date }} ({{ s.dayOfWeek }}) {{ s.startTime }}~{{ s.endTime }}
+              </option>
+            }
+          </select>
+          <span class="select-arrow">▾</span>
+        </div>
       </div>
     </div>
 
     <div class="hero-meta-bar">
+      <div class="meta-pill highlight">
+        <span>第 {{ session()?.sessionIndex ?? 1 }} / {{ currentCourse()?.totalSessions ?? 8 }} 堂</span>
+      </div>
       <div class="meta-pill">
         <span class="meta-icon">📅</span>
         <span>{{ session()?.date }} ({{ session()?.dayOfWeek }}) {{ session()?.startTime }} ~ {{ session()?.endTime }}</span>
@@ -31,7 +53,7 @@
         <span class="meta-icon">📍</span>
         <span>{{ session()?.venueName }}</span>
       </div>
-      <div class="meta-pill highlight">
+      <div class="meta-pill">
         <span>實到 {{ financials().actualAttendedCount }} / 應到 {{ financials().expectedAttendees }} 人</span>
       </div>
     </div>
@@ -70,6 +92,13 @@
               }
             }
           </div>
+
+          @if (getStudentProgress(item.student.id); as prog) {
+            <div class="student-course-progress">
+              <span class="progress-info">本期已出席 {{ prog.attendedCount }} / {{ prog.totalCourseSessions }} 堂</span>
+              <span class="progress-pill">{{ prog.attendanceRate }}% 出席率</span>
+            </div>
+          }
 
           <div class="card-center">
             @if (item.status === 'attended') {

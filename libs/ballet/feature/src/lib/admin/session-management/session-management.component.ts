@@ -20,24 +20,41 @@ export class SessionManagementComponent {
   readonly Math = Math;
   readonly state = inject(BalletStateService);
 
+  readonly courses = this.state.courses;
+  readonly currentCourse = this.state.currentCourse;
+  readonly courseFinancials = this.state.currentCourseFinancials;
+  readonly courseSessions = this.state.currentCourseSessions;
   readonly session = this.state.currentSession;
   readonly financials = this.state.currentSessionFinancials;
   readonly attendanceList = this.state.currentSessionAttendance;
   readonly studentsWithPacks = this.state.studentsWithPacks;
   readonly allSessions = this.state.sessions;
 
-  // 建立新課堂彈窗與表單 Signals
-  readonly showCreateModal = signal<boolean>(false);
-  readonly newSessionTitle = signal<string>('成人優雅芭蕾美姿體雕班');
+  // 建立新期班彈窗與表單 Signals
+  readonly showCreateCourseModal = signal<boolean>(false);
+  readonly newCourseTitle = signal<string>('');
+  readonly newCourseDescription = signal<string>('');
+  readonly newCourseTotalSessions = signal<number>(8);
+  readonly newCourseDefaultVenueCost = signal<number>(2000);
+  readonly newCourseDefaultTeacherFee = signal<number>(1200);
+  readonly newCourseDefaultFeePerStudent = signal<number>(500);
+  readonly newCourseMinThreshold = signal<number>(4);
+  readonly createCourseError = signal<string | null>(null);
+
+  // 排定新課堂彈窗與表單 Signals
+  readonly showCreateSessionModal = signal<boolean>(false);
+  readonly newSessionCourseId = signal<string>('course-1');
   readonly newSessionDate = signal<string>('');
   readonly newSessionStartTime = signal<string>('14:00');
   readonly newSessionEndTime = signal<string>('15:30');
   readonly newSessionVenue = signal<string>('敦南日光舞蹈排練室 A 廳');
   readonly newSessionVenueCost = signal<number>(2000);
+  readonly newSessionTeacherFee = signal<number>(1200);
+  readonly newSessionOtherCost = signal<number>(0);
   readonly newSessionFeePerStudent = signal<number>(500);
   readonly newSessionMaxCapacity = signal<number>(10);
   readonly newSessionMinThreshold = signal<number>(4);
-  readonly createFormError = signal<string | null>(null);
+  readonly createSessionError = signal<string | null>(null);
 
   // 根據日期自動推算星期幾
   readonly newSessionDayOfWeek = computed(() => {
@@ -71,88 +88,166 @@ export class SessionManagementComponent {
     return this.studentsWithPacks().filter(stu => !currentEnrolledStudentIds.has(stu.id));
   });
 
+  // 切換選取的期班課程
+  handleSelectCourse(courseId: string): void {
+    this.state.setSelectedCourse(courseId);
+  }
+
   // 切換選取的課堂
   handleSelectSession(sessionId: string): void {
     this.state.setSelectedSession(sessionId);
   }
 
-  // 開啟建立新課堂彈窗
-  openCreateModal(): void {
-    this.createFormError.set(null);
-    this.newSessionTitle.set('成人優雅芭蕾美姿體雕班');
+  // 開啟建立新期班彈窗
+  openCreateCourseModal(): void {
+    this.createCourseError.set(null);
+    this.newCourseTitle.set('');
+    this.newCourseDescription.set('');
+    this.newCourseTotalSessions.set(8);
+    this.newCourseDefaultVenueCost.set(2000);
+    this.newCourseDefaultTeacherFee.set(1200);
+    this.newCourseDefaultFeePerStudent.set(500);
+    this.newCourseMinThreshold.set(4);
+    this.showCreateCourseModal.set(true);
+  }
+
+  // 關閉建立新期班彈窗
+  closeCreateCourseModal(): void {
+    this.showCreateCourseModal.set(false);
+    this.createCourseError.set(null);
+  }
+
+  // 提交建立新期班課程
+  submitCreateCourse(): void {
+    const title = this.newCourseTitle().trim();
+    const description = this.newCourseDescription().trim();
+    const totalSessions = Number(this.newCourseTotalSessions());
+    const defaultVenueCost = Number(this.newCourseDefaultVenueCost());
+    const defaultTeacherFee = Number(this.newCourseDefaultTeacherFee());
+    const defaultFeePerStudent = Number(this.newCourseDefaultFeePerStudent());
+    const minThreshold = Number(this.newCourseMinThreshold());
+
+    if (!title) {
+      this.createCourseError.set('請填寫期班課程名稱');
+      return;
+    }
+    if (!totalSessions || totalSessions <= 0) {
+      this.createCourseError.set('全期總堂數必須大於 0');
+      return;
+    }
+    if (defaultVenueCost < 0 || defaultTeacherFee < 0 || defaultFeePerStudent <= 0 || minThreshold <= 0) {
+      this.createCourseError.set('預設成本與學費不可為負數，開班門檻與學費必須大於 0');
+      return;
+    }
+
+    const createdCourse = this.state.createCourse({
+      title,
+      description,
+      totalSessions,
+      defaultVenueCost,
+      defaultTeacherFee,
+      defaultFeePerStudent,
+      minThreshold
+    });
+
+    this.closeCreateCourseModal();
+    alert(`✅ 已成功建立期班課程【${createdCourse.title}】！`);
+  }
+
+  // 開啟排定新課堂彈窗
+  openCreateSessionModal(): void {
+    this.createSessionError.set(null);
+    const currCourse = this.state.currentCourse();
+    const courseId = currCourse ? currCourse.id : (this.courses()[0]?.id || 'course-1');
+
+    this.newSessionCourseId.set(courseId);
     this.newSessionDate.set(this.getNextSaturdayDate());
     this.newSessionStartTime.set('14:00');
     this.newSessionEndTime.set('15:30');
     this.newSessionVenue.set('敦南日光舞蹈排練室 A 廳');
-    this.newSessionVenueCost.set(2000);
-    this.newSessionFeePerStudent.set(500);
+    this.newSessionVenueCost.set(currCourse?.defaultVenueCost ?? 2000);
+    this.newSessionTeacherFee.set(currCourse?.defaultTeacherFee ?? 1200);
+    this.newSessionOtherCost.set(0);
+    this.newSessionFeePerStudent.set(currCourse?.defaultFeePerStudent ?? 500);
     this.newSessionMaxCapacity.set(10);
-    this.newSessionMinThreshold.set(4);
-    this.showCreateModal.set(true);
+    this.newSessionMinThreshold.set(currCourse?.minThreshold ?? 4);
+    this.showCreateSessionModal.set(true);
   }
 
-  // 關閉建立新課堂彈窗
-  closeCreateModal(): void {
-    this.showCreateModal.set(false);
-    this.createFormError.set(null);
+  // 排定課堂彈窗中切換所屬課程連動預設值
+  onCourseSelectInCreateSession(courseId: string): void {
+    this.newSessionCourseId.set(courseId);
+    const course = this.courses().find(c => c.id === courseId);
+    if (course) {
+      this.newSessionVenueCost.set(course.defaultVenueCost);
+      this.newSessionTeacherFee.set(course.defaultTeacherFee);
+      this.newSessionFeePerStudent.set(course.defaultFeePerStudent);
+      this.newSessionMinThreshold.set(course.minThreshold);
+    }
   }
 
-  // 提交建立新課堂
+  // 關閉排定新課堂彈窗
+  closeCreateSessionModal(): void {
+    this.showCreateSessionModal.set(false);
+    this.createSessionError.set(null);
+  }
+
+  // 提交排定新課堂
   submitCreateSession(): void {
-    const title = this.newSessionTitle().trim();
+    const courseId = this.newSessionCourseId();
     const date = this.newSessionDate().trim();
     const startTime = this.newSessionStartTime().trim();
     const endTime = this.newSessionEndTime().trim();
     const venueName = this.newSessionVenue().trim();
     const venueCost = Number(this.newSessionVenueCost());
+    const teacherFee = Number(this.newSessionTeacherFee());
+    const otherCost = Number(this.newSessionOtherCost());
     const feePerStudent = Number(this.newSessionFeePerStudent());
     const maxCapacity = Number(this.newSessionMaxCapacity());
     const minThreshold = Number(this.newSessionMinThreshold());
 
-    if (!title) {
-      this.createFormError.set('請填寫課程名稱');
-      return;
-    }
     if (!date) {
-      this.createFormError.set('請選擇開課日期');
+      this.createSessionError.set('請選擇開課日期');
       return;
     }
     if (!startTime || !endTime) {
-      this.createFormError.set('請填寫完整上課時段');
+      this.createSessionError.set('請填寫完整上課時段');
       return;
     }
     if (startTime >= endTime) {
-      this.createFormError.set('下課時間必須晚於開課時間');
+      this.createSessionError.set('下課時間必須晚於開課時間');
       return;
     }
     if (!venueName) {
-      this.createFormError.set('請填寫上課教室地點');
+      this.createSessionError.set('請填寫上課教室地點');
       return;
     }
-    if (venueCost <= 0 || feePerStudent <= 0 || maxCapacity <= 0 || minThreshold <= 0) {
-      this.createFormError.set('場租、學費與人數設定必須大於 0');
+    if (venueCost <= 0 || feePerStudent <= 0 || maxCapacity <= 0 || minThreshold <= 0 || teacherFee < 0 || otherCost < 0) {
+      this.createSessionError.set('成本與學費設定不可為負數，場租與學費必須大於 0');
       return;
     }
     if (minThreshold > maxCapacity) {
-      this.createFormError.set('開班門檻人數不能大於滿額人數');
+      this.createSessionError.set('開班門檻人數不能大於滿額人數');
       return;
     }
 
     const created = this.state.createSession({
-      title,
+      courseId,
       date,
       dayOfWeek: this.newSessionDayOfWeek(),
       startTime,
       endTime,
       venueName,
       venueCost,
+      teacherFee,
+      otherCost,
       feePerStudent,
       maxCapacity,
       minThreshold
     });
 
-    this.closeCreateModal();
-    alert(`✅ 已成功建立【${created.title}】（${created.date} ${created.dayOfWeek}）！`);
+    this.closeCreateSessionModal();
+    alert(`✅ 已成功排定【${created.title}】（${created.date} ${created.dayOfWeek}）！`);
   }
 
   private getNextSaturdayDate(): string {

@@ -13,17 +13,23 @@ import { SignaturePadComponent } from '@libs/shared/ui';
 export class KioskCheckinComponent {
   readonly state = inject(BalletStateService);
 
+  readonly courses = this.state.courses;
+  readonly currentCourse = this.state.currentCourse;
   readonly session = this.state.currentSession;
   readonly attendanceList = this.state.currentSessionAttendance;
   readonly financials = this.state.currentSessionFinancials;
+  readonly courseProgressList = this.state.currentCourseStudentProgress;
 
-  // 可供簽到的課堂列表（排除已取消課堂，並依日期與開始時間升冪排序）
+  // 可供簽到的課堂列表（依目前選取期班過濾，排除已取消課堂，並依堂數序號或日期升冪排序）
   readonly availableSessions = computed(() => {
+    const courseId = this.state.selectedCourseId();
     return this.state
       .sessions()
-      .filter((s) => s.status !== 'cancelled')
+      .filter((s) => s.status !== 'cancelled' && (!courseId || s.courseId === courseId))
       .slice()
       .sort((a, b) => {
+        const idxDiff = (a.sessionIndex ?? 0) - (b.sessionIndex ?? 0);
+        if (idxDiff !== 0) return idxDiff;
         const dateDiff = a.date.localeCompare(b.date);
         if (dateDiff !== 0) return dateDiff;
         return a.startTime.localeCompare(b.startTime);
@@ -39,6 +45,14 @@ export class KioskCheckinComponent {
   // 簽到成功祝賀 Toast
   readonly toastMessage = signal<string | null>(null);
 
+  // 切換選取的期班課程
+  onCourseChange(event: Event): void {
+    const select = event.target as HTMLSelectElement | null;
+    if (!select || !select.value) return;
+    this.closeSignModal();
+    this.state.setSelectedCourse(select.value);
+  }
+
   // 切換選取的課堂
   onSessionChange(event: Event): void {
     const select = event.target as HTMLSelectElement | null;
@@ -47,6 +61,11 @@ export class KioskCheckinComponent {
     // 若正開啟簽名視窗，切換課堂時重設，避免誤簽到舊課堂上下文
     this.closeSignModal();
     this.state.setSelectedSession(select.value);
+  }
+
+  // 取得特定學員在該期班的累積進度
+  getStudentProgress(studentId: string) {
+    return this.courseProgressList().find(p => p.studentId === studentId);
   }
 
   // 點擊學員卡片
