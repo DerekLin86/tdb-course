@@ -62,7 +62,6 @@
           <thead>
             <tr>
               <th>學員姓名</th>
-              <th>電話</th>
               <th>方案</th>
               <th>剩餘 / 總堂數</th>
               <th>到期日期</th>
@@ -78,7 +77,6 @@
                 <td class="col-name">
                   <strong>{{ student.name }}</strong>
                 </td>
-                <td class="col-phone">{{ student.phone }}</td>
                 <td>
                   @if (student.activePack) {
                     @if (student.activePack.type === 'trial') {
@@ -232,9 +230,6 @@
                   } @else {
                     <span class="student-item-pack-badge badge-empty">無有效票</span>
                   }
-                </div>
-                <div class="item-sub-row">
-                  <span class="student-item-phone">{{ stu.phone }}</span>
                 </div>
               </div>
             </div>

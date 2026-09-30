@@ -353,11 +353,6 @@
     color: #263342;
   }
 
-  .col-phone {
-    color: #64748b;
-    font-family: monospace;
-  }
-
   .text-muted {
     color: #94a3b8;
   }
@@ -491,6 +486,63 @@
 
       &:hover {
         background: #fee2e2;
+      }
+    }
+  }
+
+  @media (max-width: 767px) {
+    th,
+    td {
+      padding: 0.45rem 0.6rem;
+      line-height: 1.25;
+    }
+
+    .col-name {
+      font-size: 0.92rem;
+      white-space: nowrap;
+    }
+
+    .badge {
+      padding: 0.15rem 0.45rem;
+      font-size: 0.72rem;
+      border-radius: 8px;
+    }
+
+    .pack-highlight {
+      font-size: 0.92rem;
+    }
+
+    .col-buttons {
+      flex-wrap: nowrap;
+      gap: 0.25rem;
+      white-space: nowrap;
+
+      .btn-table-action {
+        padding: 0.25rem 0.45rem;
+        font-size: 0.72rem;
+        border-radius: 4px;
+        min-height: 28px;
+      }
+    }
+
+    .col-notes {
+      max-width: 110px;
+
+      .student-note {
+        font-size: 0.75rem;
+        -webkit-line-clamp: 1;
+      }
+    }
+
+    .col-manage {
+      white-space: nowrap;
+
+      .btn-edit,
+      .btn-delete {
+        padding: 0.25rem 0.45rem;
+        font-size: 0.72rem;
+        border-radius: 4px;
+        min-height: 28px;
       }
     }
   }
@@ -657,12 +709,6 @@
         background: #f1f5f9;
         color: #94a3b8;
       }
-    }
-
-    .item-sub-row {
-      font-size: 0.8rem;
-      color: #8796a5;
-      font-family: monospace;
     }
   }
 
