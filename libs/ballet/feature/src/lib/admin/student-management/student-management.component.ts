@@ -21,8 +21,6 @@ export class StudentManagementComponent {
 
   readonly studentsWithPacks = this.state.studentsWithPacks;
 
-  // 標籤頁切換
-  readonly activeTab = signal<'tickets' | 'students'>('tickets');
 
   // 簽名放大查看彈窗
   readonly viewingSignature = signal<{

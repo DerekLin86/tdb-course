@@ -20,168 +20,8 @@
     </div>
   </header>
 
-  <!-- 標籤頁切換列 -->
-  <div class="tab-buttons">
-    <button
-      type="button"
-      class="tab-btn"
-      [class.active]="activeTab() === 'tickets'"
-      (click)="activeTab.set('tickets')"
-    >
-      全班學員票卡總覽列表
-    </button>
-    <button
-      type="button"
-      class="tab-btn"
-      [class.active]="activeTab() === 'students'"
-      (click)="activeTab.set('students')"
-    >
-      學員個人檔案與歷史歷程
-    </button>
-  </div>
-
-  <!-- 分頁一：學員票卡與儲值管理 -->
-  @if (activeTab() === 'tickets') {
-    <section class="admin-table-card">
-      <div class="table-header-action">
-        <div>
-          <h2 class="table-card-title">學員名單與票卡效期控管</h2>
-          <span class="table-tip">支援新增、編輯與移除學員名單；效期不足 14 天將顯示提醒</span>
-        </div>
-        <button
-          type="button"
-          class="btn-add-student"
-          (click)="openAddStudentModal()"
-        >
-          <span class="btn-icon">＋</span> 新增學員
-        </button>
-      </div>
-
-      <div class="table-responsive">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>學員姓名</th>
-              <th>方案</th>
-              <th>剩餘 / 總堂數</th>
-              <th>到期日期</th>
-              <th>效期狀態</th>
-              <th>課堂備註</th>
-              <th>票卡儲值</th>
-              <th>名單操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (student of studentsWithPacks(); track student.id) {
-              <tr>
-                <td class="col-name">
-                  <strong>{{ student.name }}</strong>
-                </td>
-                <td>
-                  @if (student.activePack) {
-                    @if (student.activePack.type === 'trial') {
-                      <span class="badge badge-trial">體驗課 (1堂)</span>
-                    } @else {
-                      <span class="badge badge-pack">
-                        {{ student.activePack.totalCount }} 堂包
-                      </span>
-                    }
-                  } @else {
-                    <span class="text-muted">無有效卡</span>
-                  }
-                </td>
-                <td>
-                  @if (student.activePack; as p) {
-                    <strong class="pack-highlight">{{ p.remainingCount }}</strong> / {{ p.totalCount }} 堂
-                  } @else {
-                    -
-                  }
-                </td>
-                <td>
-                  {{ student.activePack?.expiryDate || '-' }}
-                </td>
-                <td>
-                  @if (student.activePack) {
-                    @if (student.daysUntilExpiry !== undefined && student.daysUntilExpiry <= 0) {
-                      <span class="badge badge-danger">已過期</span>
-                    } @else if (student.isNearExpiry) {
-                      <span class="badge badge-danger">
-                        剩 {{ student.daysUntilExpiry }} 天到期
-                      </span>
-                    } @else {
-                      <span class="badge badge-success">
-                        正常 (剩 {{ student.daysUntilExpiry }} 天)
-                      </span>
-                    }
-                  } @else {
-                    -
-                  }
-                </td>
-                <td class="col-notes">
-                  <span class="student-note">{{ student.notes || '-' }}</span>
-                </td>
-                <td class="col-buttons">
-                  <button
-                    type="button"
-                    class="btn-table-action btn-add-trial"
-                    [disabled]="state.hasPurchasedTrial(student.id)"
-                    [class.btn-disabled]="state.hasPurchasedTrial(student.id)"
-                    (click)="handleAddPack(student, 'trial')"
-                    [title]="state.hasPurchasedTrial(student.id) ? '每位學員終身限購 1 次' : '儲值單堂體驗課 ($400 / 14天)'"
-                  >
-                    {{ state.hasPurchasedTrial(student.id) ? '已購體驗課' : '＋ 體驗課 (1堂)' }}
-                  </button>
-                  <button
-                    type="button"
-                    class="btn-table-action btn-add-5"
-                    (click)="handleAddPack(student, '5_class')"
-                  >
-                    ＋ 5 堂卡
-                  </button>
-                  <button
-                    type="button"
-                    class="btn-table-action btn-add-10"
-                    (click)="handleAddPack(student, '10_class')"
-                  >
-                    ＋ 10 堂卡
-                  </button>
-                  <button
-                    type="button"
-                    class="btn-table-action btn-extend"
-                    (click)="handleExtendExpiry(student)"
-                  >
-                    展延 30 天
-                  </button>
-                </td>
-                <td class="col-manage">
-                  <button
-                    type="button"
-                    class="btn-table-action btn-edit"
-                    (click)="openEditStudentModal(student)"
-                    title="編輯學員資料"
-                  >
-                    編輯
-                  </button>
-                  <button
-                    type="button"
-                    class="btn-table-action btn-delete"
-                    (click)="handleDeleteStudent(student)"
-                    title="從班級名單中移除"
-                  >
-                    移除
-                  </button>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    </section>
-  }
-
-  <!-- 分頁二：學員檔案與歷程 Master-Detail -->
-  @if (activeTab() === 'students') {
-    <div class="students-master-detail">
+  <!-- 學員檔案與歷程 Master-Detail 視圖 -->
+  <div class="students-master-detail">
       <!-- 左側 Master 側欄：學員清單與即時搜尋 -->
       <aside class="students-sidebar">
         <div class="sidebar-header">
@@ -224,8 +64,18 @@
                 <div class="item-name-row">
                   <span class="student-item-name">{{ stu.name }}</span>
                   @if (stu.activePack) {
-                    <span class="student-item-pack-badge" [class.badge-low]="stu.activePack.remainingCount <= 2">
-                      剩 {{ stu.activePack.remainingCount }} 堂
+                    <span
+                      class="student-item-pack-badge"
+                      [class.badge-low]="stu.activePack.remainingCount <= 2"
+                      [class.badge-danger]="stu.isNearExpiry || (stu.daysUntilExpiry !== undefined && stu.daysUntilExpiry <= 0)"
+                    >
+                      @if (stu.daysUntilExpiry !== undefined && stu.daysUntilExpiry <= 0) {
+                        已過期
+                      } @else if (stu.isNearExpiry) {
+                        剩 {{ stu.activePack.remainingCount }} 堂 ({{ stu.daysUntilExpiry }}天)
+                      } @else {
+                        剩 {{ stu.activePack.remainingCount }} 堂
+                      }
                     </span>
                   } @else {
                     <span class="student-item-pack-badge badge-empty">無有效票</span>
@@ -269,6 +119,14 @@
                   (click)="openEditStudentModal(stu)"
                 >
                   ✏️ 修改基本資料
+                </button>
+                <button
+                  type="button"
+                  class="btn-profile-delete"
+                  (click)="handleDeleteStudent(stu)"
+                  title="從班級名單中移除學員"
+                >
+                  🗑️ 移除學員
                 </button>
               </div>
             </div>
@@ -518,7 +376,6 @@
         }
       </main>
     </div>
-  }
 
   <!-- 手寫簽名存根放大彈窗 -->
   @if (viewingSignature(); as sig) {
