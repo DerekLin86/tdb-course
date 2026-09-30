@@ -2,6 +2,8 @@
 // Triple Dream Ballet (TDB) - Student Management Styles
 // =============================================================================
 
+@use 'responsive' as *;
+
 // --- Reusable Placeholder Selectors ---
 %btn-berry-base {
   display: inline-flex;
@@ -128,22 +130,34 @@
 
 // --- Layout & Container ---
 .student-management-container {
+  width: 100%;
   max-width: 1100px;
+  box-sizing: border-box;
+  overflow-x: hidden;
   margin: 0 auto;
   padding: 1rem 1.5rem 4rem;
   display: flex;
   flex-direction: column;
   gap: 1.75rem;
 
-  @media (min-width: 768px) and (max-width: 1024px) {
+  @include tablet-ipad {
     padding: 1.25rem 1.5rem 3rem;
     gap: 1.5rem;
   }
 
-  @media (max-width: 767px) {
+  @include iphone {
     padding: 0.75rem 1rem 2.5rem;
     gap: 1.25rem;
   }
+}
+
+.admin-header,
+.admin-table-card,
+.detail-card,
+.students-sidebar {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .admin-header,
@@ -201,7 +215,7 @@
     }
   }
 
-  @media (max-width: 767px) {
+  @include iphone {
     flex-direction: column;
     align-items: flex-start;
     padding: 1.25rem 1rem;
@@ -222,17 +236,30 @@
 
 // --- 左側 Master 側邊欄 ---
 .students-master-detail {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   display: grid;
   grid-template-columns: 340px 1fr;
   gap: 1.5rem;
   align-items: start;
 
-  @media (max-width: 1024px) {
-    grid-template-columns: 1fr;
+  @include tablet-ipad {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  @include iphone {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
   }
 }
 
 .students-sidebar {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   background: #ffffff;
   border-radius: 20px;
   border: 1px solid #e7edf3;
@@ -400,16 +427,28 @@
 
 // --- 右側 Detail 面板 ---
 .student-detail-panel {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
 
   .detail-card {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
     background: #ffffff;
     border-radius: 20px;
     border: 1px solid #e7edf3;
     padding: 1.75rem;
     box-shadow: 0 6px 20px -3px rgba(50, 70, 90, 0.05);
+
+    @include iphone {
+      padding: 1.25rem 1rem;
+    }
   }
 
   .student-profile-card {
@@ -575,7 +614,7 @@
         }
       }
 
-      @media (max-width: 767px) {
+      @include iphone {
         .notes-editor-row {
           flex-direction: column;
 
@@ -595,12 +634,19 @@
     grid-template-columns: repeat(4, 1fr);
     gap: 1rem;
 
-    @media (max-width: 767px) {
+    @include tablet-ipad {
       grid-template-columns: repeat(2, 1fr);
+    }
+
+    @include iphone {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.6rem;
     }
   }
 
   .stat-mini-card {
+    min-width: 0;
+    word-break: break-word;
     background: #ffffff;
     border-radius: 16px;
     border: 1px solid #e7edf3;
@@ -713,6 +759,14 @@
           cursor: not-allowed;
         }
       }
+    }
+
+    .table-responsive {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      display: block;
     }
 
     .packs-table {

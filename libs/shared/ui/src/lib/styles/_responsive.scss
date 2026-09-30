@@ -1,0 +1,44 @@
+// =============================================================================
+// Triple Dream Ballet (TDB) - Responsive Mixins & Breakpoints
+// =============================================================================
+
+$breakpoint-iphone-compact: 375px;
+$breakpoint-iphone-standard: 430px;
+$breakpoint-mobile: 767px;
+$breakpoint-tablet-min: 768px;
+$breakpoint-tablet-max: 1024px;
+$breakpoint-desktop: 1025px;
+
+@mixin iphone {
+  @media (max-width: #{$breakpoint-mobile}) {
+    @content;
+  }
+}
+
+@mixin iphone-standard {
+  @media (max-width: #{$breakpoint-iphone-standard}) {
+    @content;
+  }
+}
+
+@mixin iphone-compact {
+  @media (max-width: #{$breakpoint-iphone-compact}) {
+    @content;
+  }
+}
+
+@mixin tablet-ipad {
+  @media (min-width: #{$breakpoint-tablet-min}) and (max-width: #{$breakpoint-tablet-max}) {
+    @content;
+  }
+}
+
+@mixin desktop {
+  @media (min-width: #{$breakpoint-desktop}) {
+    @content;
+  }
+}
+
+@mixin iphone-safe-bottom {
+  padding-bottom: calc(var(--safe-bottom, 0px) + var(--bottom-tabbar-height, 60px) + 1rem);
+}

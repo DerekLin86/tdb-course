@@ -9,7 +9,10 @@
       "executor": "@angular-devkit/build-angular:karma",
       "options": {
         "polyfills": ["zone.js", "zone.js/testing"],
-        "tsConfig": "libs/ballet/feature/tsconfig.spec.json"
+        "tsConfig": "libs/ballet/feature/tsconfig.spec.json",
+        "stylePreprocessorOptions": {
+          "includePaths": ["libs/shared/ui/src/lib/styles"]
+        }
       }
     }
   }

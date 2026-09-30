@@ -7,6 +7,10 @@
 
 .app-main-content {
   flex: 1;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 
   @media (max-width: 767px) {
     padding-bottom: calc(var(--bottom-tabbar-height, 60px) + var(--safe-bottom, 0px) + 1rem);
