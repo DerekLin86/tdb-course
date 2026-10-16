@@ -6,7 +6,9 @@ services:
     container_name: tdb-backend
     restart: unless-stopped
     environment:
-      - DATABASE_URL=sqlite:////app/data/triple_d_ballet.db
+      - ENVIRONMENT=production
+      # 正式環境資料庫：生產環境專用資料庫檔案 (triple_d_ballet.prod.db)，保護真實業務資料並限制破壞性重置
+      - DATABASE_URL=sqlite:////app/data/triple_d_ballet.prod.db
       - PYTHONUNBUFFERED=1
     volumes:
       # 持久化資料庫路徑：存放 SQLite 資料庫檔案（NAS 建議掛載 /volume1/docker/triple-d-ballet/data）

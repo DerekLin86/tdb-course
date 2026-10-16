@@ -3,7 +3,7 @@
 ## Architecture
 - **Framework & Structure**: Nx Monorepo (Nx 20) with Angular 20+ frontend (`apps/triple-d-ballet-class`) and Python FastAPI backend (`apps/api`).
 - **Data Access & State Flow**:
-  - Backend: FastAPI REST API + SQLite database (`apps/api/triple_d_ballet.db`) with Pydantic v2 schemas configured with camelCase alias serialization (`alias_generator = to_camel`, `populate_by_name = True`) and CORS enabled for `http://localhost:4200`.
+  - Backend: FastAPI REST API + SQLite WAL database with Dev/Prod isolation (`data/triple_d_ballet.dev.db` vs `data/triple_d_ballet.prod.db`), Pydantic v2 schemas configured with camelCase alias serialization (`alias_generator = to_camel`, `populate_by_name = True`), CORS enabled for `http://localhost:4200`, and production safety guardrails (`POST /api/v1/system/reset` returns 403 Forbidden).
   - Frontend: `@libs/ballet/data-access` (`BalletStateService`) acts as the state store via Angular Signals (`signal`, `computed`), communicating with the FastAPI backend via Angular `HttpClient` while preserving 100% backward compatibility for `/kiosk`, `/student`, and `/admin`.
   - Sign-in & Signature: Mode A iPad Kiosk captures high-DPR HTML5 Canvas hand-drawn signature with bezier smoothing (requiring $\ge 5$ strokes), exports Base64 PNG Data URL (`data:image/png;base64,...`), persists in SQLite as `TEXT`, and provides immediate rendering in admin audit views.
   - 24-Hour Policy: $\Delta t = \text{ClassStartTime} - \text{RequestTime}$. $\Delta t \ge 24.0\text{h} \implies \text{leave\_advance}$ (0 deduction). $\Delta t < 24.0\text{h} \implies \text{leave\_late}$ (1 class deduction). Cancelling late leave refunds 1 class.
@@ -23,12 +23,12 @@
 | F-09 | Manual Status Override | Admin manual override of attendance status (`registered`, `attended`, `leave_advance`, `leave_late`, `absent`) | M1 | survey, ballet-state.service |
 | F-10 | Financial Break-Even Monitor | Real-time calculation of revenue, rent $2,000, net profit, and 4-person break-even alert (`isAtRisk`) | M1 | ORIGINAL_REQUEST:18,35, survey |
 | F-11 | Emergency Deferral & Refund | Cancel session due to threshold failure, atomically refunding all deducted tickets | M1 | survey, ARCHITECTURE:96 |
-| F-12 | FastAPI Backend & SQLite DB | Python FastAPI service in `apps/api`, SQLite persistence, CORS, OpenAPI (`/docs`), automated testing | M1 | ORIGINAL_REQUEST:12-20, survey |
+| F-12 | FastAPI Backend & Dev/Prod SQLite DB | Python FastAPI service in `apps/api`, SQLite WAL persistence with Dev/Prod dual DB isolation (`dev.db` / `prod.db`), production reset guardrail (403 Forbidden), CORS, OpenAPI (`/docs`), automated testing | M1 | ORIGINAL_REQUEST:12-20, survey |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Production-Grade FastAPI Backend & SQLite DB | `apps/api` service setup, SQLite models, Pydantic schemas (camelCase serialization), routers for students/packs/sessions/attendance/financials, 24h leave engine, Mode A Base64 check-in, 4-person break-even alert, and comprehensive pytest suite | none | IN_PROGRESS |
+| M1 | Production-Grade FastAPI Backend & Dev/Prod SQLite DB | `apps/api` service setup, SQLite models, WAL mode with Dev/Prod DB isolation (`dev.db` / `prod.db`), production seed/reset safety guardrails, Pydantic schemas (camelCase serialization), routers for students/packs/sessions/attendance/financials, 24h leave engine, Mode A Base64 check-in, 4-person break-even alert, and comprehensive pytest suite | none | IN_PROGRESS |
 | M2 | Angular Data Access Layer Integration | Configure `provideHttpClient()` in `apps/triple-d-ballet-class/src/app/app.config.ts`, update `@libs/ballet/data-access` (`BalletApiService` + `BalletStateService`) to sync with FastAPI backend while preserving 100% Signal API compatibility for `/kiosk`, `/student`, `/admin` | M1 | PLANNED |
 | M3 | Full-Stack E2E Testing & PR Quality Gate | Requirement-driven test suite validation, adversarial coverage hardening, zero regression check, and 100% passing `npm run validate:pr` | M1, M2 | PLANNED |
 
@@ -85,7 +85,7 @@ CORS configured for `http://localhost:4200` with `allow_origins=["http://localho
   - Response: `AttendanceRecordResponse`
 
 #### 4. System Utility
-- `POST /api/v1/system/reset` -> `{ message: string }` (resets to initial seed data)
+- `POST /api/v1/system/reset` -> `{ message: string }` (resets to initial seed data; returns `403 Forbidden` with `{"detail": "Database reset is strictly prohibited in production environment."}` in production mode)
 
 ## Code Layout
 ```
@@ -94,7 +94,7 @@ apps/
 │   ├── project.json                          # Nx application configuration with "forwardAllArgs": false
 │   ├── requirements.txt                      # Dependencies: fastapi, uvicorn, pydantic, httpx, pytest, pytest-asyncio
 │   ├── main.py                               # Application factory, CORS, router mounts
-│   ├── database.py                           # SQLite connection, session generator, init_db()
+│   ├── database.py                           # Dev/Prod SQLite WAL connection, environment resolution, seed/reset guardrails
 │   ├── models/                               # SQLite SQLModel / SQLAlchemy entities
 │   │   ├── __init__.py
 │   │   ├── student.py                        # Student, TicketPack

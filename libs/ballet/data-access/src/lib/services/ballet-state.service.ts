@@ -41,9 +41,6 @@ export class BalletStateService {
   readonly selectedSessionId = signal<string>('session-upcoming');
   readonly selectedStudentId = signal<string>('stu-1');
 
-  // 測試輔助：模擬距離開課的小時數（預設 30 小時，方便切換驗證 24h 前後）
-  readonly simulationHoursUntilClass = signal<number>(30);
-
   // 1. 當前課程 Computed
   readonly currentCourse = computed(() => {
     const id = this.selectedCourseId();
@@ -373,8 +370,7 @@ export class BalletStateService {
         sessions: this.sessions(),
         attendance: this.attendance(),
         selectedSessionId: this.selectedSessionId(),
-        selectedStudentId: this.selectedStudentId(),
-        simulationHoursUntilClass: this.simulationHoursUntilClass()
+        selectedStudentId: this.selectedStudentId()
       };
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
@@ -520,8 +516,8 @@ export class BalletStateService {
     return { success: true, message: `✅ ${student.name} 簽到成功！剩餘 ${pack.remainingCount - 1} 堂。` };
   }
 
-  // 學員端提出請假 (自動以 24h 規則判斷)
-  requestLeave(studentId: string, reason?: string): { success: boolean; isAdvance: boolean; message: string } {
+  // 學員端提出請假 (手動確認或依參數判斷提前/逾期請假)
+  requestLeave(studentId: string, reason?: string, isAdvance?: boolean): { success: boolean; isAdvance: boolean; message: string } {
     const session = this.currentSession();
     if (!session) return { success: false, isAdvance: false, message: '查無當前課程' };
 
@@ -529,12 +525,22 @@ export class BalletStateService {
     if (!student) return { success: false, isAdvance: false, message: '查無該學員' };
 
     const pack = this.ticketPacks().find(p => p.studentId === studentId && p.status === 'active');
-    const hoursLeft = this.simulationHoursUntilClass();
-    const isAdvance = hoursLeft >= 24;
 
+    let advance = isAdvance;
+    if (advance === undefined) {
+      if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+        advance = window.confirm(
+          `請確認學員【${student.name}】之請假性質：\n\n・點擊「確定」：提前請假（開課 24 小時前，保留堂數不扣除）\n・點擊「取消」：逾期請假（開課 24 小時內，扣抵 1 堂場租）`
+        );
+      } else {
+        advance = true;
+      }
+    }
+
+    const hoursLeft = advance ? 36 : 12;
     const now = new Date().toISOString();
 
-    if (isAdvance) {
+    if (advance) {
       // 24 小時前：不扣堂數
       const newRecord: AttendanceRecord = {
         id: `att-${session.id}-${studentId}`,
@@ -545,7 +551,7 @@ export class BalletStateService {
         deductedCount: 0,
         leaveRequestedAt: now,
         leaveReason: reason || '提前請假 (保有堂數)',
-        remark: `開課前 ${hoursLeft} 小時線上請假，完整保留堂數`
+        remark: '開課 24 小時前線上請假，完整保留堂數'
       };
 
       this.upsertAttendance(newRecord);
@@ -568,7 +574,7 @@ export class BalletStateService {
       return {
         success: true,
         isAdvance: true,
-        message: `您已成功請假！距開課還有 ${hoursLeft} 小時，堂數完整保留不扣除。`
+        message: `學員【${student.name}】已成功辦理提前請假，堂數完整保留不扣除。`
       };
     } else {
       // 24 小時內：扣除 1 堂（場租防虧損規則）
@@ -596,7 +602,7 @@ export class BalletStateService {
         deductedCount: 1,
         leaveRequestedAt: now,
         leaveReason: reason || '逾時請假 (分攤場租扣堂)',
-        remark: `開課前 ${hoursLeft} 小時請假（未達24小時前），依規則扣抵 1 堂場租`
+        remark: '開課 24 小時內請假，依規則扣抵 1 堂場租'
       };
 
       this.upsertAttendance(newRecord);
@@ -619,7 +625,7 @@ export class BalletStateService {
       return {
         success: true,
         isAdvance: false,
-        message: `距開課僅剩 ${hoursLeft} 小時（不足24小時），已為您完成請假，並依教室場租分攤規定扣抵 1 堂。`
+        message: `學員【${student.name}】逾時請假（未達開課24小時前），已完成請假紀錄，並依教室場租分攤規定扣抵 1 堂。`
       };
     }
   }
@@ -1246,10 +1252,6 @@ export class BalletStateService {
     }
   }
 
-  setSimulationHours(hours: number) {
-    this.simulationHoursUntilClass.set(hours);
-  }
-
   setSelectedStudent(studentId: string) {
     this.selectedStudentId.set(studentId);
   }
@@ -1333,7 +1335,6 @@ export class BalletStateService {
           this.attendance.set(parsed.attendance);
           this.selectedSessionId.set(parsed.selectedSessionId || 'session-upcoming');
           this.selectedStudentId.set(parsed.selectedStudentId || 'stu-1');
-          this.simulationHoursUntilClass.set(parsed.simulationHoursUntilClass ?? 30);
           return;
         }
       } catch (e) {
@@ -1520,6 +1521,5 @@ export class BalletStateService {
     this.attendance.set(initialAttendance);
     this.selectedSessionId.set('session-upcoming');
     this.selectedStudentId.set('stu-1');
-    this.simulationHoursUntilClass.set(30);
   }
 }

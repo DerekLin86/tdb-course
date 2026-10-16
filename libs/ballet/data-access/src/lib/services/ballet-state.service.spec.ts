@@ -53,8 +53,7 @@ describe('BalletStateService (防虧損與出缺勤業務邏輯測試 - 單機�
     const initialPack = service.ticketPacks().find(p => p.studentId === studentId && p.status === 'active');
     const initialCount = initialPack!.remainingCount;
 
-    service.setSimulationHours(36); // 設定為距開課 36 小時前
-    const result = service.requestLeave(studentId, '家族聚餐');
+    const result = service.requestLeave(studentId, '家族聚餐', true);
 
     expect(result.success).toBeTrue();
     expect(result.isAdvance).toBeTrue();
@@ -74,8 +73,7 @@ describe('BalletStateService (防虧損與出缺勤業務邏輯測試 - 單機�
     const initialPack = service.ticketPacks().find(p => p.studentId === studentId && p.status === 'active');
     const initialCount = initialPack!.remainingCount;
 
-    service.setSimulationHours(12); // 設定為距開課 12 小時前 (不足 24h)
-    const result = service.requestLeave(studentId, '臨時有事');
+    const result = service.requestLeave(studentId, '臨時有事', false);
 
     expect(result.success).toBeTrue();
     expect(result.isAdvance).toBeFalse();
@@ -91,12 +89,10 @@ describe('BalletStateService (防虧損與出缺勤業務邏輯測試 - 單機�
   });
 
   it('【防虧損防線三】：當出席人數低於最低開班門檻時，觸發損益警報', () => {
-    service.setSimulationHours(36);
-
     // 讓 7 位學員提前請假，只剩 3 人出席 (低於門檻 4 人)
     const studentsToLeave = ['stu-3', 'stu-4', 'stu-5', 'stu-6', 'stu-7', 'stu-8', 'stu-9'];
     for (const sid of studentsToLeave) {
-      service.requestLeave(sid);
+      service.requestLeave(sid, undefined, true);
     }
 
     const financials = service.currentSessionFinancials();
@@ -107,10 +103,9 @@ describe('BalletStateService (防虧損與出缺勤業務邏輯測試 - 單機�
 
   it('【老師一鍵防虧退租】：開班未達門檻時順延課堂，全數歸還學員扣堂', () => {
     const sessionId = service.currentSession()!.id;
-    service.setSimulationHours(12);
 
     // 某學生在 12h 內請假被扣了 1 堂
-    service.requestLeave('stu-10');
+    service.requestLeave('stu-10', undefined, false);
     const packBefore = service.ticketPacks().find(p => p.studentId === 'stu-10')!;
 
     // 老師發現人數太少，決定順延本週以退租場地避免虧本
@@ -122,6 +117,23 @@ describe('BalletStateService (防虧損與出缺勤業務邏輯測試 - 單機�
     // 被扣除的 1 堂應退還給學生
     const packAfter = service.ticketPacks().find(p => p.studentId === 'stu-10')!;
     expect(packAfter.remainingCount).toBe(packBefore.remainingCount + 1);
+  });
+
+  it('【請假確認視窗】：當 isAdvance 未提供時，應透過 window.confirm 詢問請假性質', () => {
+    const confirmSpy = spyOn(window, 'confirm');
+
+    // 1. 使用者點擊「確定」(true) -> 提前請假
+    confirmSpy.and.returnValue(true);
+    const advanceResult = service.requestLeave('stu-4', '事假測試');
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(advanceResult.success).toBeTrue();
+    expect(advanceResult.isAdvance).toBeTrue();
+
+    // 2. 使用者點擊「取消」(false) -> 逾期請假
+    confirmSpy.and.returnValue(false);
+    const lateResult = service.requestLeave('stu-5', '事假測試');
+    expect(lateResult.success).toBeTrue();
+    expect(lateResult.isAdvance).toBeFalse();
   });
 
   it('【票卡儲值與展延】：應正確新增票卡堂數與展延效期', () => {
@@ -596,9 +608,8 @@ describe('BalletStateService (後端 API 整合與非同步同步機制)', () =>
 
   it('requestLeave() 在本地計算 24h 後應非同步呼叫後端 API requestLeave', () => {
     service.refreshFromBackend();
-    service.setSimulationHours(36);
 
-    const result = service.requestLeave('stu-remote-1', '個人事假');
+    const result = service.requestLeave('stu-remote-1', '個人事假', true);
     expect(result.success).toBeTrue();
     expect(result.isAdvance).toBeTrue();
     expect(mockApi.requestLeave).toHaveBeenCalledWith('session-remote-1', 'stu-remote-1', '個人事假', 36);

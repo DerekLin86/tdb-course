@@ -22,7 +22,7 @@
   .brand-logo {
     font-size: 1.5rem;
     font-weight: 800;
-    color: #8e5b69;
+    color: var(--primary);
     letter-spacing: 0.08em;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
@@ -72,64 +72,6 @@
     }
   }
 
-  .user-greeting {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: #8e5b69;
-    margin-left: 0.5rem;
-  }
-}
-
-.sim-pill-group {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid #d1d9e2;
-  border-radius: 20px;
-  padding: 0.2rem 0.45rem;
-  font-size: 0.8rem;
-
-  .sim-label {
-    color: #8796a5;
-    margin-right: 0.2rem;
-    font-size: 0.75rem;
-    padding-left: 0.25rem;
-  }
-
-  .sim-btn {
-    background: transparent;
-    border: none;
-    color: #64748b;
-    padding: 0.2rem 0.5rem;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s ease;
-
-    &:hover {
-      color: #1e293b;
-    }
-
-    &.active {
-      background: #8e5b69;
-      color: #ffffff;
-    }
-  }
-
-  .sim-reset-btn {
-    background: transparent;
-    border: none;
-    color: #94a3b8;
-    padding: 0.2rem 0.4rem;
-    font-size: 0.75rem;
-    cursor: pointer;
-
-    &:hover {
-      color: #475569;
-    }
-  }
 }
 
 .mobile-bottom-tabbar {
@@ -167,23 +109,6 @@
     display: none;
   }
 
-  .sim-pill-group {
-    padding: 0.2rem 0.35rem;
-
-    .sim-label {
-      display: none;
-    }
-
-    .sim-btn,
-    .sim-reset-btn {
-      padding: 0.35rem 0.55rem;
-      min-height: 36px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-  }
-
   .mobile-bottom-tabbar {
     position: fixed;
     bottom: 0;
@@ -196,7 +121,7 @@
     background: rgba(255, 255, 255, 0.92);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border-top: 1px solid #e5ecf3;
+    border-top: 1px solid var(--border-subtle);
     height: calc(var(--bottom-tabbar-height, 60px) + var(--safe-bottom, 0px));
     padding-bottom: var(--safe-bottom, 0px);
 
@@ -225,11 +150,11 @@
       }
 
       &.active {
-        color: #8e5b69;
+        color: var(--primary);
         font-weight: 600;
 
         .tab-label {
-          color: #8e5b69;
+          color: var(--primary);
         }
       }
 

@@ -10,9 +10,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Generator, Generic, List, Optional, Set, Type, TypeVar, Union
 
+
+def get_environment() -> str:
+    return os.getenv("ENVIRONMENT", "development").lower()
+
+
+def is_production() -> bool:
+    return get_environment() == "production"
+
+
 # Database file location
 BASE_DIR = Path(__file__).resolve().parent
-DEFAULT_DB_FILE = BASE_DIR / "triple_d_ballet.db"
+DEFAULT_DB_FILE = BASE_DIR / ("triple_d_ballet.prod.db" if is_production() else "triple_d_ballet.dev.db")
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_FILE}")
 
 T = TypeVar("T")
@@ -233,6 +242,17 @@ class Metadata:
             all_defs = col_defs + fk_defs + table_constraints
             create_sql = f"CREATE TABLE IF NOT EXISTS {tablename} ({', '.join(all_defs)});"
             cur.execute(create_sql)
+
+            # Auto-migration: check for missing columns in existing table and dynamically alter table
+            cur.execute(f"PRAGMA table_info({tablename});")
+            existing_cols = {row["name"] for row in cur.fetchall()}
+            for col_name, col in model_cls._columns.items():
+                if col_name not in existing_cols:
+                    sqlite_type = "TEXT"
+                    if isinstance(col.col_type, Integer) or col.col_type is Integer:
+                        sqlite_type = "INTEGER"
+                    alter_sql = f"ALTER TABLE {tablename} ADD COLUMN {col_name} {sqlite_type};"
+                    cur.execute(alter_sql)
 
         conn.commit()
 
@@ -647,6 +667,9 @@ def init_db(seed: bool = True, force_seed: bool = False) -> None:
     from seed import seed_mock_data
 
     Base.metadata.create_all(bind=engine)
+    if is_production() and not force_seed:
+        return
+
     if seed or force_seed:
         with SessionLocal() as db:
             if force_seed or db.query(Student).count() == 0:
@@ -655,6 +678,9 @@ def init_db(seed: bool = True, force_seed: bool = False) -> None:
 
 def reset_db() -> None:
     """Drop all tables, recreate, and re-seed with standard mock datasets."""
+    if is_production():
+        raise RuntimeError("reset_db is strictly prohibited in production environment")
+
     from models.student import Student, TicketPack
     from models.session import ClassSession
     from models.attendance import AttendanceRecord

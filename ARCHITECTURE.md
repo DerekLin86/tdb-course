@@ -12,7 +12,7 @@
 - **技術棧 (Tech Stack)**：
   - **Monorepo 工具**：Nx 20.4+
   - **前端框架**：Angular 20+ (Standalone Components, Angular Signals)
-  - **後端框架**：Python FastAPI (RESTful API, Pydantic v2, SQLite WAL 持久化)
+  - **後端框架**：Python FastAPI (RESTful API, Pydantic v2, SQLite WAL 持久化，Dev/Prod 資料庫隔離與生產環境重置防護)
   - **語言**：TypeScript 5.6+ / Python 3.13+
   - **樣式**：SCSS（全域變數與 Design Tokens）
   - **繪圖**：HTML5 Canvas 原生手寫貝茲平滑畫布 (Signature Pad)
@@ -34,7 +34,7 @@ triple-d-ballet-class/
 ├── apps/
 │   ├── api/                         # 後端應用 (Python FastAPI + SQLite)
 │   │   ├── main.py                  # FastAPI 主程式、CORS、Routers 掛載
-│   │   ├── database.py              # SQLite 資料庫連線與 Session
+│   │   ├── database.py              # Dev/Prod WAL 資料庫連線、環境解析與生產防護 (seed/reset guardrails)
 │   │   ├── models/                  # SQLAlchemy / SQLite 資料模型
 │   │   ├── schemas/                 # Pydantic v2 CamelCase 序列化合約
 │   │   ├── routers/                 # RESTful 端點 (students, sessions, attendance, system)
@@ -111,6 +111,16 @@ triple-d-ballet-class/
    - **損益平衡門檻**：每堂課固定場租為 \$2,000，每人每堂收費折合 \$500，最低開班人數門檻為 4 人。當實到人數 $< 4$ 時，系統自動觸發虧損警報，支援老師一鍵順延停課並退還扣堂。
    - **手寫簽名存根**：學員於 iPad 簽到時必須手繪簽名，生成 Base64 PNG 永久綁定該課堂出勤紀錄，供老師後台調閱防範堂數爭議。
 
+### 資料庫環境分流與產品化防護機制 (Database Environment & Safety Guardrails)
+
+- **環境切分 (Environment Isolation)**：
+  - `ENVIRONMENT=development`：預設資料庫為 `data/triple_d_ballet.dev.db`，資料庫為空時自動注入 10 筆示範學員，允許呼叫 `/system/reset` 進行重置測試。
+  - `ENVIRONMENT=production`：預設資料庫為 `data/triple_d_ballet.prod.db`，僅執行 `Base.metadata.create_all()` 建立資料表結構，嚴格禁止自動注入 Mock 資料。
+- **生產安全防護 (Production Guardrails)**：
+  - `init_db()`：生產模式下跳過 `seed_mock_data()`。
+  - `reset_db()`：生產模式下直接拋出 `RuntimeError`。
+  - `POST /api/v1/system/reset`：生產模式下回傳 `HTTP 403 Forbidden`，防止誤刪正式資料。
+
 ---
 
 ## 4. Verification & Quality Gates
@@ -148,7 +158,7 @@ npm run validate:pr
 | **老師端課程管理** | [`libs/ballet/feature/src/lib/admin/session-management/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/ballet/feature/src/lib/admin/session-management/) |
 | **老師端學生管理** | [`libs/ballet/feature/src/lib/admin/student-management/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/ballet/feature/src/lib/admin/student-management/) |
 | **後端 FastAPI 主程式** | [`apps/api/main.py`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/main.py) |
-| **後端 SQLite 資料庫連線** | [`apps/api/database.py`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/database.py) |
+| **後端 SQLite 資料庫連線與環境防護** | [`apps/api/database.py`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/database.py) |
 | **後端 RESTful 路由群組** | [`apps/api/routers/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/routers/) |
 | **後端業務邏輯服務** | [`apps/api/services/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/services/) |
 | **後端 Pytest 整合測試** | [`apps/api/tests/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/tests/) |
@@ -172,3 +182,53 @@ Triple Dream Ballet 專案針對教室 iPad 現場與學員/老師手機端實�
    ```scss
    bottom: calc(var(--safe-bottom, 0px) + var(--bottom-tabbar-height, 60px) + 1rem);
    ```
+
+---
+
+## 7. Database Auto-Migration & Schema Evolution Guide for Agents
+
+本系統採用輕量零相依（Zero-Dependency）的資料庫自動遷移機制，確保開發與生產環境在持續迭代時皆能實現平滑無痛演進（Zero Downtime & Zero Data Loss）。所有維護或擴充資料模型的 Agent 須嚴格遵守以下準則：
+
+### 7.1 Auto-Migration Mechanism (自動遷移機制)
+
+- **啟動自動檢查**：在 [`apps/api/database.py`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/database.py) 中，`Metadata.create_all(bind=engine)` 於每次應用程式啟動 (`init_db()`) 時自動執行。
+- **欄位差異探測**：針對已存在的資料表，系統透過 `PRAGMA table_info({tablename})` 動態查詢 SQLite 底層現有欄位清單。
+- **自動補齊缺漏欄位**：若 Python ORM 類別（`_columns`）宣告的欄位不存在於現有 SQLite 資料表中，系統自動發出：
+  ```sql
+  ALTER TABLE {tablename} ADD COLUMN {col_name} {sqlite_type};
+  ```
+- **資料完整性保證**：既有資料表中的所有資料行（Rows）100% 完整保留，不需中斷服務，亦不破壞現有業務資料。
+
+### 7.2 Agent SOP: Adding a New Column to an Existing Model (擴充既有資料表欄位 SOP)
+
+當業務需求需要為既有實體新增屬性時，Agent 須遵循以下三步驟：
+
+1. **Step 1: 更新 ORM Model**
+   在 `apps/api/models/<model_name>.py` 中加入新屬性：
+   ```python
+   new_field = Column(String(), nullable=True, default=None)
+   # 或數值型別：
+   # count_field = Column(Integer(), nullable=True, default=0)
+   ```
+   > [!IMPORTANT]
+   > **SQLite 限制約束規則**：SQLite 的 `ALTER TABLE ADD COLUMN` 語法要求新增欄位**必須為 `nullable=True` 或具備常數預設值 (`default=...`)**，絕對不可設定為「沒有預設值的 `NOT NULL`」。Agent 在擴充欄位時必須嚴格遵守此規則。
+
+2. **Step 2: 更新 Pydantic Schemas**
+   在 `apps/api/schemas/<model_name>.py` 中的 Request / Response Schema 加入新欄位定義，維持 camelCase 序列化合約（使用 `Field(default=..., alias="camelCaseName")` 或專案約定命名規則）。
+
+3. **Step 3: 完成並重啟**
+   修改完成！後端應用重啟（無論在本地 Dev 還是生產環境 Docker 容器）時，`init_db()` 會執行 `Metadata.create_all()`，自動探測到新欄位並下達 `ALTER TABLE`。**Agent 無須手寫任何 SQL 遷移腳本，嚴格禁止刪除或重建資料表！**
+
+### 7.3 Agent SOP: Adding a New Table (新增資料表 SOP)
+
+當業務需求需要建立全新資料表時：
+
+1. 定義繼承自 `Base` 的新模型類別，並明確宣告 `__tablename__ = "table_name"`。
+2. 確保該模型類別在 `apps/api/database.py` 的 `init_db()` 或 `apps/api/models/__init__.py` 中被引入（Import），以觸發 `Metadata.register()`。
+3. 下次系統啟動時，`Metadata.create_all()` 透過 `CREATE TABLE IF NOT EXISTS` 自動建立全新實體資料表。
+
+### 7.4 Production Data Protection Rule for Agents (生產資料防護規則)
+
+- **嚴禁破壞性操作**：在生產環境（`ENVIRONMENT=production`）下，Agent **絕不可**呼叫 `reset_db()` 或執行任何 `DROP TABLE` 破壞性操作。
+- **重置端點防護**：`POST /api/v1/system/reset` 於生產環境已內建攔截並一律回傳 `403 Forbidden`，防止任何自動化任務或外部請求誤刪正式營運數據。
+
