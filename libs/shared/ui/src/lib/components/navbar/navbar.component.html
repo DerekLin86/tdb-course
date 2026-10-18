@@ -1,36 +1,38 @@
 <nav class="app-navbar">
-  <div class="brand-group">
-    <a routerLink="/kiosk" class="brand-link">
-      <span class="brand-logo">TDB</span>
-      <span class="brand-title sr-only">Triple-D 芭蕾舞蹈教室</span>
-    </a>
-  </div>
-
-  <div class="nav-right">
-    <div class="nav-links">
-      <a
-        routerLink="/kiosk"
-        routerLinkActive="active"
-        class="nav-link"
-      >
-        Kiosk 簽到
+  <div class="navbar-inner">
+    <div class="brand-group">
+      <a routerLink="/kiosk" class="brand-link">
+        <span class="brand-logo">TDB</span>
+        <span class="brand-title sr-only">Triple-D 芭蕾舞蹈教室</span>
       </a>
+    </div>
 
-      <a
-        routerLink="/admin/sessions"
-        routerLinkActive="active"
-        class="nav-link"
-      >
-        課程管理
-      </a>
+    <div class="nav-right">
+      <div class="nav-links">
+        <a
+          routerLink="/kiosk"
+          routerLinkActive="active"
+          class="nav-link"
+        >
+          Kiosk 簽到
+        </a>
 
-      <a
-        routerLink="/admin/students"
-        routerLinkActive="active"
-        class="nav-link"
-      >
-        學生管理
-      </a>
+        <a
+          routerLink="/admin/sessions"
+          routerLinkActive="active"
+          class="nav-link"
+        >
+          課程管理
+        </a>
+
+        <a
+          routerLink="/admin/students"
+          routerLinkActive="active"
+          class="nav-link"
+        >
+          學生管理
+        </a>
+      </div>
     </div>
   </div>
 </nav>

@@ -1,15 +1,27 @@
+@use 'responsive' as *;
+
 .app-navbar {
   background: transparent;
-  padding: 1.25rem 2.5rem;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1.5rem;
+  justify-content: center;
   position: sticky;
   top: 0;
   z-index: 1000;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  width: 100%;
+  padding: 0;
+}
+
+.navbar-inner {
+  width: 100%;
+  max-width: var(--container-max-width, 1120px);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem var(--container-pad-desktop, 1.5rem);
 }
 
 .brand-group {
@@ -58,6 +70,9 @@
     color: #4b5563;
     padding: 0.35rem 0.75rem;
     border-radius: 6px;
+    min-height: var(--touch-target-min, 44px);
+    display: inline-flex;
+    align-items: center;
     transition: all 0.15s ease;
 
     &:hover {
@@ -79,23 +94,27 @@
 }
 
 /* Tablet (768px ~ 1024px) */
-@media (min-width: 768px) and (max-width: 1024px) {
-  .app-navbar {
-    padding: 1rem 1.5rem;
+@include tablet-ipad {
+  .navbar-inner {
+    padding: 1rem var(--container-pad-tablet, 1.25rem);
   }
 }
 
 /* Desktop (> 1024px) */
-@media (min-width: 1025px) {
-  .app-navbar {
-    padding: 1.25rem 2.5rem;
+@include desktop {
+  .navbar-inner {
+    padding: 1.25rem var(--container-pad-desktop, 1.5rem);
   }
 }
 
 /* Mobile (< 768px) */
-@media (max-width: 767px) {
+@include iphone {
   .app-navbar {
-    padding: 0.75rem 1rem;
+    padding-top: calc(var(--safe-top, 0px) + 0.75rem);
+  }
+
+  .navbar-inner {
+    padding: 0 var(--container-pad-mobile, 1rem) 0.75rem;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
@@ -124,6 +143,8 @@
     border-top: 1px solid var(--border-subtle);
     height: calc(var(--bottom-tabbar-height, 60px) + var(--safe-bottom, 0px));
     padding-bottom: var(--safe-bottom, 0px);
+    padding-left: var(--safe-left, 0px);
+    padding-right: var(--safe-right, 0px);
 
     .tab-item {
       display: flex;

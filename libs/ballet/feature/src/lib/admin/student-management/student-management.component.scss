@@ -30,6 +30,8 @@
 %modal-card-base {
   background: #ffffff;
   width: 92%;
+  max-height: 90vh;
+  max-height: 90dvh;
   overflow: hidden;
   box-shadow: 0 25px 60px -15px rgba(25, 35, 45, 0.25);
   display: flex;
@@ -40,8 +42,10 @@
 %modal-close-btn {
   background: #f1f5f9;
   border: none;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 50%;
   font-size: 0.95rem;
   color: #64748b;
@@ -131,22 +135,22 @@
 // --- Layout & Container ---
 .student-management-container {
   width: 100%;
-  max-width: 1100px;
+  max-width: var(--container-max-width, 1120px);
   box-sizing: border-box;
   overflow-x: hidden;
   margin: 0 auto;
-  padding: 1rem 1.5rem 4rem;
+  padding: 1rem var(--container-pad-desktop, 1.5rem) 2.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.75rem;
 
   @include tablet-ipad {
-    padding: 1.25rem 1.5rem 3rem;
+    padding: 1.25rem var(--container-pad-tablet, 1.25rem) 2rem;
     gap: 1.5rem;
   }
 
   @include iphone {
-    padding: 0.75rem 1rem 2.5rem;
+    padding: 0.75rem var(--container-pad-mobile, 1rem) 0;
     gap: 1.25rem;
   }
 }
@@ -163,7 +167,7 @@
 .admin-header,
 .admin-table-card {
   background: #ffffff;
-  border-radius: 24px;
+  border-radius: var(--radius-2xl, 24px);
   border: 1px solid #e7edf3;
   box-shadow: 0 10px 30px -5px rgba(50, 70, 90, 0.05);
 }
@@ -246,7 +250,8 @@
   align-items: start;
 
   @include tablet-ipad {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: 1.25rem;
   }
 
   @include iphone {
@@ -261,7 +266,7 @@
   max-width: 100%;
   box-sizing: border-box;
   background: #ffffff;
-  border-radius: 20px;
+  border-radius: var(--radius-xl, 20px);
   border: 1px solid #e7edf3;
   box-shadow: 0 6px 20px -3px rgba(50, 70, 90, 0.05);
   overflow: hidden;
@@ -311,6 +316,11 @@
       font-size: 0.8rem;
       cursor: pointer;
       padding: 0.1rem 0.3rem;
+      min-width: 36px;
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
 
       &:hover {
         color: #475569;
@@ -328,6 +338,14 @@
     max-height: 720px;
     overflow-y: auto;
     padding: 0.5rem;
+
+    @include tablet-ipad {
+      max-height: 520px;
+    }
+
+    @include iphone {
+      max-height: 220px;
+    }
   }
 
   .student-list-item {
@@ -441,7 +459,7 @@
     max-width: 100%;
     box-sizing: border-box;
     background: #ffffff;
-    border-radius: 20px;
+    border-radius: var(--radius-xl, 20px);
     border: 1px solid #e7edf3;
     padding: 1.75rem;
     box-shadow: 0 6px 20px -3px rgba(50, 70, 90, 0.05);
@@ -528,6 +546,9 @@
         border-radius: 12px;
         font-size: 0.88rem;
         cursor: pointer;
+        min-height: var(--touch-target-min, 44px);
+        display: inline-flex;
+        align-items: center;
         transition: all 0.15s ease;
 
         &:hover {
@@ -545,6 +566,7 @@
         font-size: 0.88rem;
         font-weight: 600;
         cursor: pointer;
+        min-height: var(--touch-target-min, 44px);
         transition: all 0.2s ease;
         display: inline-flex;
         align-items: center;
@@ -621,7 +643,7 @@
           .btn-save-notes {
             width: 100%;
             justify-content: center;
-            min-height: 40px;
+            min-height: var(--touch-target-min, 44px);
           }
         }
       }
@@ -648,7 +670,7 @@
     min-width: 0;
     word-break: break-word;
     background: #ffffff;
-    border-radius: 16px;
+    border-radius: var(--radius-lg, 16px);
     border: 1px solid #e7edf3;
     padding: 1.1rem;
     box-shadow: 0 4px 12px -2px rgba(50, 70, 90, 0.04);
@@ -689,6 +711,11 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+
+      @include iphone {
+        white-space: normal;
+        word-break: break-word;
+      }
     }
   }
 
@@ -723,10 +750,14 @@
       .btn-quick-pack {
         border: none;
         padding: 0.45rem 0.85rem;
-        border-radius: 8px;
+        border-radius: var(--radius-sm, 8px);
         font-size: 0.82rem;
         font-weight: 600;
         cursor: pointer;
+        min-height: var(--touch-target-min, 44px);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         transition: opacity 0.15s ease;
 
         &:hover {
@@ -1186,7 +1217,6 @@
   @extend %modal-card-base;
   max-width: 600px;
   border-radius: 24px;
-  max-height: 90vh;
 
   .form-card-header {
     padding: 1.5rem 1.75rem 1.25rem;

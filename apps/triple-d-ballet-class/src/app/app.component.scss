@@ -13,6 +13,6 @@
   overflow-x: hidden;
 
   @media (max-width: 767px) {
-    padding-bottom: calc(var(--bottom-tabbar-height, 60px) + var(--safe-bottom, 0px) + 1rem);
+    padding-bottom: calc(var(--bottom-tabbar-height, 60px) + var(--safe-bottom, 0px) + 1.25rem);
   }
 }

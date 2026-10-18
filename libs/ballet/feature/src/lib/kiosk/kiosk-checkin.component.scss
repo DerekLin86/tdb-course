@@ -1,19 +1,21 @@
+@use 'responsive' as *;
+
 .kiosk-wrapper {
-  max-width: 1060px;
+  max-width: var(--container-max-width, 1120px);
   margin: 0 auto;
-  padding: 1rem 1.5rem 4rem;
+  padding: 1rem var(--container-pad-desktop, 1.5rem) 2.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2.5rem;
 
-  @media (min-width: 768px) and (max-width: 1024px) {
-    padding: 1.25rem 1.5rem 3rem;
+  @include tablet-ipad {
+    padding: 1.25rem var(--container-pad-tablet, 1.25rem) 2rem;
     gap: 2rem;
   }
 
-  @media (max-width: 767px) {
-    padding: 0.75rem 1rem 2rem;
+  @include iphone {
+    padding: 0.75rem var(--container-pad-mobile, 1rem) 0;
     gap: 1.5rem;
   }
 }
@@ -21,7 +23,7 @@
 // 核心主視覺卡片（對標參考圖中之白色懸浮卡片）
 .hero-card {
   background: #ffffff;
-  border-radius: 32px;
+  border-radius: var(--radius-hero, 32px);
   padding: 3rem 2.5rem 2.5rem;
   width: 100%;
   max-width: 580px;
@@ -32,18 +34,18 @@
   align-items: center;
   border: 1px solid rgba(255, 255, 255, 0.8);
 
-  @media (min-width: 768px) and (max-width: 1024px) {
+  @include tablet-ipad {
     padding: 2.5rem 2rem;
-    border-radius: 28px;
+    border-radius: var(--radius-card, 28px);
 
     .hero-title {
       font-size: 2.4rem;
     }
   }
 
-  @media (max-width: 767px) {
+  @include iphone {
     padding: 1.75rem 1.25rem;
-    border-radius: 24px;
+    border-radius: var(--radius-2xl, 24px);
 
     .hero-title {
       font-size: 1.9rem;
@@ -203,7 +205,7 @@
     text-align: center;
     margin-bottom: 1.75rem;
 
-    @media (max-width: 767px) {
+    @include iphone {
       margin-bottom: 1.25rem;
 
       .section-title {
@@ -232,12 +234,12 @@
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 1.25rem;
 
-  @media (min-width: 768px) and (max-width: 1024px) {
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  @include tablet-ipad {
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
     gap: 1.25rem;
   }
 
-  @media (max-width: 767px) {
+  @include iphone {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
@@ -245,7 +247,7 @@
 
 .student-card {
   background: #ffffff;
-  border-radius: 20px;
+  border-radius: var(--radius-xl, 20px);
   padding: 1.4rem;
   box-shadow: 0 10px 30px -5px rgba(50, 70, 90, 0.05);
   border: 1px solid #e7edf3;
@@ -256,7 +258,7 @@
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
 
-  @media (max-width: 767px) {
+  @include iphone {
     padding: 1.15rem;
     min-height: 180px;
   }
@@ -278,7 +280,7 @@
       font-weight: 700;
       color: #223140;
 
-      @media (max-width: 767px) {
+      @include iphone {
         font-size: 1.4rem;
       }
     }
@@ -357,7 +359,7 @@
       transition: all 0.15s ease;
       box-shadow: 0 4px 12px rgba(142, 91, 105, 0.25);
 
-      @media (max-width: 767px) {
+      @include iphone {
         min-height: 44px;
         padding: 0.65rem 1.5rem;
       }
@@ -456,12 +458,16 @@
   background: #24303e;
   color: #ffffff;
   padding: 0.85rem 1.75rem;
-  border-radius: 30px;
+  border-radius: var(--radius-pill, 9999px);
   font-size: 0.95rem;
   font-weight: 600;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
   z-index: 10000;
   animation: fadeUp 0.25s ease-out;
+
+  @include iphone {
+    bottom: calc(var(--safe-bottom, 0px) + var(--bottom-tabbar-height, 60px) + 1rem);
+  }
 }
 
 @keyframes fadeUp {
