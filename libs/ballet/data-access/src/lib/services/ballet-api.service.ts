@@ -1,29 +1,49 @@
-import { Injectable, InjectionToken, inject } from '@angular/core';
+import { Injectable, Optional, InjectionToken, Inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of, throwError } from 'rxjs';
-import { Student, StudentWithActivePack, TicketPack } from '../types/student.type';
-import { AttendanceRecord, AttendanceStatus, ClassSession, Course, SessionFinancialStats } from '../types/attendance.type';
-import {
-  CheckInResponse,
-  LeaveResponse,
-  CancelLeaveResponse,
-  CancelThresholdResponse,
-  TicketPackCreateRequest,
-  SystemResetResponse,
-  DeleteCourseResponse,
-} from '../types/api.type';
 
 export const BALLET_API_BASE_URL = new InjectionToken<string>('BALLET_API_BASE_URL', {
   providedIn: 'root',
   factory: () => 'http://localhost:8000/api/v1'
 });
+import {
+  Student,
+  StudentWithActivePack,
+  CreateStudentParams,
+  UpdateStudentParams,
+  TicketPack,
+  PurchaseTicketPackParams,
+  ExtendTicketPackParams,
+  ClassSession,
+  CreateClassSessionParams,
+  AttendanceRecord,
+  AttendanceStatus,
+  SessionFinancialStats,
+  Course,
+  CreateCourseParams,
+  CourseFinancialStats,
+  CourseEnrollment,
+  EnrollStudentInCourseRequest,
+  DeleteCourseEnrollmentResponse,
+  CancelThresholdResponse,
+  CheckInResponse,
+  LeaveResponse,
+  CancelLeaveResponse,
+  SystemResetResponse
+} from '../types';
 
 @Injectable({
   providedIn: 'root'
 })
 export class BalletApiService {
-  private readonly http = inject(HttpClient, { optional: true });
-  readonly baseUrl = inject(BALLET_API_BASE_URL);
+  readonly baseUrl: string;
+
+  constructor(
+    @Optional() private readonly http?: HttpClient,
+    @Optional() @Inject(BALLET_API_BASE_URL) baseUrl?: string
+  ) {
+    this.baseUrl = baseUrl || 'http://localhost:8000/api/v1';
+  }
 
   get isAvailable(): boolean {
     return !!this.http;
@@ -35,50 +55,35 @@ export class BalletApiService {
     return this.http.get<StudentWithActivePack[]>(`${this.baseUrl}/students`);
   }
 
-  createStudent(payload: Partial<Student>): Observable<StudentWithActivePack> {
+  getStudentById(studentId: string): Observable<Student> {
     if (!this.http) return throwError(() => new Error('HttpClient not available'));
-    return this.http.post<StudentWithActivePack>(`${this.baseUrl}/students`, payload);
+    return this.http.get<Student>(`${this.baseUrl}/students/${studentId}`);
   }
 
-  getStudentById(studentId: string): Observable<StudentWithActivePack> {
+  createStudent(payload: CreateStudentParams): Observable<Student> {
     if (!this.http) return throwError(() => new Error('HttpClient not available'));
-    return this.http.get<StudentWithActivePack>(`${this.baseUrl}/students/${studentId}`);
+    return this.http.post<Student>(`${this.baseUrl}/students`, payload);
   }
 
-  updateStudent(studentId: string, payload: Partial<Student>): Observable<StudentWithActivePack> {
+  updateStudent(studentId: string, payload: UpdateStudentParams): Observable<Student> {
     if (!this.http) return throwError(() => new Error('HttpClient not available'));
-    return this.http.put<StudentWithActivePack>(`${this.baseUrl}/students/${studentId}`, payload);
+    return this.http.put<Student>(`${this.baseUrl}/students/${studentId}`, payload);
   }
 
-  deleteStudent(studentId: string): Observable<{ message: string; success: boolean }> {
+  deleteStudent(studentId: string): Observable<{ success: boolean; message: string }> {
     if (!this.http) return throwError(() => new Error('HttpClient not available'));
-    return this.http.delete<{ message: string; success: boolean }>(`${this.baseUrl}/students/${studentId}`);
+    return this.http.delete<{ success: boolean; message: string }>(`${this.baseUrl}/students/${studentId}`);
   }
 
-  purchaseTicketPack(payload: TicketPackCreateRequest): Observable<TicketPack> {
+  purchaseTicketPack(payload: PurchaseTicketPackParams): Observable<TicketPack> {
     if (!this.http) return throwError(() => new Error('HttpClient not available'));
     return this.http.post<TicketPack>(`${this.baseUrl}/ticket-packs`, payload);
   }
 
-  extendTicketPack(packId: string, extraDays = 30): Observable<TicketPack> {
+  extendTicketPack(packId: string, payload: ExtendTicketPackParams | number = 30): Observable<TicketPack> {
     if (!this.http) return throwError(() => new Error('HttpClient not available'));
-    return this.http.patch<TicketPack>(`${this.baseUrl}/ticket-packs/${packId}/extend`, { extraDays });
-  }
-
-  // 1.5. Courses
-  getCourses(): Observable<Course[]> {
-    if (!this.http) return of([]);
-    return this.http.get<Course[]>(`${this.baseUrl}/courses`);
-  }
-
-  createCourse(payload: Partial<Course>): Observable<Course> {
-    if (!this.http) return throwError(() => new Error('HttpClient not available'));
-    return this.http.post<Course>(`${this.baseUrl}/courses`, payload);
-  }
-
-  deleteCourse(courseId: string): Observable<DeleteCourseResponse> {
-    if (!this.http) return throwError(() => new Error('HttpClient not available'));
-    return this.http.delete<DeleteCourseResponse>(`${this.baseUrl}/courses/${courseId}`);
+    const body = typeof payload === 'number' ? { extraDays: payload } : payload;
+    return this.http.patch<TicketPack>(`${this.baseUrl}/ticket-packs/${packId}/extend`, body);
   }
 
   // 2. Class Sessions & Financials
@@ -87,14 +92,18 @@ export class BalletApiService {
     return this.http.get<ClassSession[]>(`${this.baseUrl}/sessions`);
   }
 
-  createSession(payload: Partial<ClassSession>): Observable<ClassSession> {
+  createSession(payload: CreateClassSessionParams): Observable<ClassSession> {
     if (!this.http) return throwError(() => new Error('HttpClient not available'));
     return this.http.post<ClassSession>(`${this.baseUrl}/sessions`, payload);
   }
 
-  getSession(sessionId: string): Observable<ClassSession> {
+  getSessionById(sessionId: string): Observable<ClassSession> {
     if (!this.http) return throwError(() => new Error('HttpClient not available'));
     return this.http.get<ClassSession>(`${this.baseUrl}/sessions/${sessionId}`);
+  }
+
+  getSession(sessionId: string): Observable<ClassSession> {
+    return this.getSessionById(sessionId);
   }
 
   getSessionFinancials(sessionId: string): Observable<SessionFinancialStats> {
@@ -105,11 +114,11 @@ export class BalletApiService {
   cancelSessionDueToThreshold(sessionId: string, reason?: string): Observable<CancelThresholdResponse> {
     if (!this.http) return throwError(() => new Error('HttpClient not available'));
     return this.http.post<CancelThresholdResponse>(`${this.baseUrl}/sessions/${sessionId}/cancel-threshold`, {
-      reason: reason || '人數未達最低開班門檻（場租損益防護退租）'
+      reason
     });
   }
 
-  // 3. Attendance & Mode A Kiosk Check-in
+  // 3. Attendance & Kiosk Check-In
   getSessionAttendance(sessionId: string): Observable<AttendanceRecord[]> {
     if (!this.http) return of([]);
     return this.http.get<AttendanceRecord[]>(`${this.baseUrl}/sessions/${sessionId}/attendance`);
@@ -126,7 +135,7 @@ export class BalletApiService {
   requestLeave(
     sessionId: string,
     studentId: string,
-    leaveReason?: string,
+    leaveReason: string,
     simulationHours?: number
   ): Observable<LeaveResponse> {
     if (!this.http) return throwError(() => new Error('HttpClient not available'));
@@ -155,6 +164,42 @@ export class BalletApiService {
       status,
       remark
     });
+  }
+
+  // Courses API
+  getCourses(): Observable<Course[]> {
+    if (!this.http) return of([]);
+    return this.http.get<Course[]>(`${this.baseUrl}/courses`);
+  }
+
+  createCourse(payload: CreateCourseParams): Observable<Course> {
+    if (!this.http) return throwError(() => new Error('HttpClient not available'));
+    return this.http.post<Course>(`${this.baseUrl}/courses`, payload);
+  }
+
+  getCourseById(courseId: string): Observable<Course> {
+    if (!this.http) return throwError(() => new Error('HttpClient not available'));
+    return this.http.get<Course>(`${this.baseUrl}/courses/${courseId}`);
+  }
+
+  deleteCourse(courseId: string): Observable<{ success: boolean; message: string }> {
+    if (!this.http) return throwError(() => new Error('HttpClient not available'));
+    return this.http.delete<{ success: boolean; message: string }>(`${this.baseUrl}/courses/${courseId}`);
+  }
+
+  getCourseStudents(courseId: string): Observable<CourseEnrollment[]> {
+    if (!this.http) return of([]);
+    return this.http.get<CourseEnrollment[]>(`${this.baseUrl}/courses/${courseId}/students`);
+  }
+
+  enrollStudentInCourse(courseId: string, payload: EnrollStudentInCourseRequest): Observable<CourseEnrollment> {
+    if (!this.http) return throwError(() => new Error('HttpClient not available'));
+    return this.http.post<CourseEnrollment>(`${this.baseUrl}/courses/${courseId}/students`, payload);
+  }
+
+  removeStudentFromCourse(courseId: string, studentId: string): Observable<DeleteCourseEnrollmentResponse> {
+    if (!this.http) return throwError(() => new Error('HttpClient not available'));
+    return this.http.delete<DeleteCourseEnrollmentResponse>(`${this.baseUrl}/courses/${courseId}/students/${studentId}`);
   }
 
   // 4. System Utility

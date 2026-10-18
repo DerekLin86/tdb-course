@@ -85,10 +85,19 @@ export class SessionManagementComponent {
   readonly newQuickStudentNotes = signal<string>('');
   readonly newQuickStudentPackType = signal<'none' | '5_class' | '10_class' | 'trial'>('10_class');
 
-  // 尚未加入當前課堂名冊的學員
+  // 尚未加入當前期班名冊的學員 (以期班為核心綁定)
   readonly availableStudentsToEnroll = computed(() => {
-    const currentEnrolledStudentIds = new Set(this.attendanceList().map(item => item.student.id));
-    return this.studentsWithPacks().filter(stu => !currentEnrolledStudentIds.has(stu.id));
+    const currentCourse = this.currentCourse();
+    if (!currentCourse) {
+      const currentEnrolledStudentIds = new Set(this.attendanceList().map(item => item.student.id));
+      return this.studentsWithPacks().filter(stu => !currentEnrolledStudentIds.has(stu.id));
+    }
+    const enrolledIds = new Set(
+      this.state.courseEnrollments()
+        .filter(ce => ce.courseId === currentCourse.id && ce.status === 'active')
+        .map(ce => ce.studentId)
+    );
+    return this.studentsWithPacks().filter(stu => !enrolledIds.has(stu.id));
   });
 
   // 切換選取的期班課程
@@ -311,8 +320,8 @@ export class SessionManagementComponent {
   }
 
   openEnrollModal(): void {
-    if (!this.session()) {
-      alert('請先排定課堂，再為課堂加入學員。');
+    if (!this.currentCourse() && !this.session()) {
+      alert('請先選擇期班或排定課堂，再為名冊加入學員。');
       return;
     }
     this.enrollError.set(null);
@@ -333,30 +342,36 @@ export class SessionManagementComponent {
 
   submitEnrollStudent(): void {
     const studentId = this.selectedStudentToEnroll();
+    const course = this.currentCourse();
     const curr = this.session();
-    if (!curr) {
-      this.enrollError.set('請先選擇課堂');
-      return;
-    }
+    const courseId = course?.id || curr?.courseId;
+
     if (!studentId) {
       this.enrollError.set('請選擇要加入的學員');
       return;
     }
 
-    const rec = this.state.enrollStudentInSession(curr.id, studentId);
-    if (rec) {
-      this.closeEnrollModal();
-    } else {
-      this.enrollError.set('加入課堂名冊失敗');
+    if (courseId) {
+      const enr = this.state.enrollStudentInCourse(courseId, studentId);
+      if (enr) {
+        this.closeEnrollModal();
+        return;
+      }
+    } else if (curr) {
+      const rec = this.state.enrollStudentInSession(curr.id, studentId);
+      if (rec) {
+        this.closeEnrollModal();
+        return;
+      }
     }
+
+    this.enrollError.set('加入期班名冊失敗');
   }
 
   submitQuickCreateAndEnroll(): void {
+    const course = this.currentCourse();
     const curr = this.session();
-    if (!curr) {
-      this.enrollError.set('請先選擇課堂');
-      return;
-    }
+    const courseId = course?.id || curr?.courseId;
 
     const name = this.newQuickStudentName().trim();
     const phone = this.newQuickStudentPhone().trim();
@@ -385,13 +400,40 @@ export class SessionManagementComponent {
       initialPackType: packType
     });
 
-    this.state.enrollStudentInSession(curr.id, newStudent.id);
+    if (courseId) {
+      this.state.enrollStudentInCourse(courseId, newStudent.id);
+    } else if (curr) {
+      this.state.enrollStudentInSession(curr.id, newStudent.id);
+    }
+
     this.closeEnrollModal();
+  }
+
+  handleRemoveFromCourse(studentId: string, studentName: string): void {
+    const course = this.currentCourse();
+    const curr = this.session();
+    const courseId = course?.id || curr?.courseId;
+    if (!courseId) {
+      if (curr) {
+        this.handleRemoveFromSession(studentId, studentName);
+      }
+      return;
+    }
+
+    const courseTitle = course?.title || '當前期班';
+    if (confirm(`確定要將學員【${studentName}】自期班【${courseTitle}】名冊中移出嗎？\n（未上課之待簽到堂數將自名冊移出，已完成之歷史出席與扣堂記錄將安全保留）`)) {
+      this.state.removeStudentFromCourse(courseId, studentId);
+    }
   }
 
   handleRemoveFromSession(studentId: string, studentName: string): void {
     const curr = this.session();
     if (!curr) return;
+
+    if (curr.courseId) {
+      this.handleRemoveFromCourse(studentId, studentName);
+      return;
+    }
 
     if (confirm(`確定要將學員【${studentName}】自本堂課名冊中移出嗎？`)) {
       this.state.removeStudentFromSession(curr.id, studentId);

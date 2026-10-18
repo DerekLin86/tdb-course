@@ -251,8 +251,9 @@
         type="button"
         class="btn-enroll-student"
         (click)="openEnrollModal()"
+        title="加入學員至當前期班名冊，本期班所有課堂將同步包含此學員"
       >
-        <span class="btn-icon">+</span> 加入學員至本堂課
+        <span class="btn-icon">+</span> 加入學員至本期班
       </button>
     </div>
 
@@ -274,10 +275,10 @@
             <tr>
               <td colspan="7" class="empty-roster-cell">
                 <div class="empty-roster-box">
-                  <p class="empty-roster-title">目前本堂課名冊尚無學員</p>
-                  <p class="empty-roster-desc">新建立課堂預設不預先匯入學員資料，請點擊上方按鈕手動加入學員名冊。</p>
+                  <p class="empty-roster-title">目前本期班名冊尚無學員</p>
+                  <p class="empty-roster-desc">請點擊上方按鈕將學員加入本期班名冊，加入後本期班所有課堂將自動同步登錄。</p>
                   <button type="button" class="btn-enroll-inline" (click)="openEnrollModal()">
-                    + 立即手動加入學員
+                    + 立即加入學員至期班
                   </button>
                 </div>
               </td>
@@ -348,9 +349,9 @@
                   type="button"
                   class="btn-remove-session"
                   (click)="handleRemoveFromSession(item.student.id, item.student.name)"
-                  title="自本堂課名冊移出"
+                  title="自本期班名冊移出（未上課堂移除，已完成歷史出席與扣堂記錄安全保留）"
                 >
-                  移出名冊
+                  移出期班
                 </button>
               </td>
             </tr>
@@ -729,12 +730,12 @@
     </div>
   }
 
-  <!-- 手動加入學員至課堂彈窗 -->
+  <!-- 手動加入學員至期班彈窗 -->
   @if (showEnrollModal()) {
     <div class="modal-backdrop" (click)="closeEnrollModal()">
       <div class="modal-card modal-enroll" (click)="$event.stopPropagation()">
         <div class="modal-header">
-          <h3>加入學員至本堂課</h3>
+          <h3>加入學員至【{{ currentCourse()?.title || '當前期班' }}】名冊</h3>
           <button type="button" class="btn-close" (click)="closeEnrollModal()">✕</button>
         </div>
 
@@ -763,13 +764,13 @@
           }
 
           <p class="modal-desc">
-            當前課堂：<strong>{{ session()?.title || '當前課堂' }}</strong>@if (session(); as curr) {（{{ curr.date }} {{ curr.dayOfWeek }}）}
+            當前期班：<strong>{{ currentCourse()?.title || '當前期班' }}</strong>（加入後將自動登錄於本期班所有課堂名冊）
           </p>
 
           @if (enrollMode() === 'existing') {
             @if (availableStudentsToEnroll().length === 0) {
               <div class="empty-available-box">
-                <p>全班所有學員皆已在此堂課名冊中！</p>
+                <p>所有學員皆已加入此期班名冊！</p>
                 <span class="sub-hint">若需新增未建檔學員，請切換至「+ 建立新學員並加入」標籤。</span>
               </div>
             } @else {

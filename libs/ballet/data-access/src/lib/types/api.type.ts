@@ -78,5 +78,5 @@ export interface SystemResetResponse {
 
 export interface DeleteCourseResponse {
   success: boolean;
-  message?: string;
+  message: string;
 }

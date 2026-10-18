@@ -29,6 +29,11 @@ class Student(Base):
         back_populates="student",
         cascade="all, delete-orphan"
     )
+    course_enrollments = relationship(
+        "CourseEnrollment",
+        back_populates="student",
+        cascade="all, delete-orphan"
+    )
 
 
 class TicketPack(Base):

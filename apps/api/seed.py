@@ -5,9 +5,43 @@ from database import Session
 from models.student import Student, TicketPack
 from models.session import ClassSession
 from models.attendance import AttendanceRecord
+from models.course import Course
+from models.course_enrollment import CourseEnrollment
 
 
 def seed_mock_data(db: Session) -> None:
+    # 0. Courses
+    courses = [
+        Course(
+            id='course-1',
+            title='成人優雅芭蕾美姿體雕班 (秋季期班)',
+            description='適合成人初學與美姿體態鍛鍊',
+            total_sessions=8,
+            default_venue_cost=2000,
+            default_teacher_fee=1200,
+            default_fee_per_student=500,
+            min_threshold=4,
+            status='active',
+            start_date='2026-09-12',
+            end_date='2026-10-31',
+        ),
+        Course(
+            id='course-2',
+            title='成人芭蕾足尖技巧進階班',
+            description='適合具備1年以上基礎學員',
+            total_sessions=8,
+            default_venue_cost=2000,
+            default_teacher_fee=1200,
+            default_fee_per_student=550,
+            min_threshold=4,
+            status='active',
+            start_date='2026-09-17',
+            end_date='2026-11-05',
+        ),
+    ]
+    for c in courses:
+        db.merge(c)
+
     # 1. 10 Students (Age 40~70 realistic scenarios)
     students = [
         Student(id='stu-1', name='陳秀琴', phone='0912-345-678', notes='芭蕾3年經驗', registered_at='2025-01-10'),
@@ -44,6 +78,8 @@ def seed_mock_data(db: Session) -> None:
     sessions = [
         ClassSession(
             id='session-upcoming',
+            course_id='course-1',
+            session_index=2,
             date='2026-09-19',
             day_of_week='週六',
             start_time='14:00',
@@ -58,6 +94,8 @@ def seed_mock_data(db: Session) -> None:
         ),
         ClassSession(
             id='session-prev',
+            course_id='course-1',
+            session_index=1,
             date='2026-09-12',
             day_of_week='週六',
             start_time='14:00',
@@ -74,7 +112,22 @@ def seed_mock_data(db: Session) -> None:
     for ses in sessions:
         db.merge(ses)
 
-    # 4. Initial Attendance Records
+    # 4. Course Enrollments
+    enrollments = [
+        CourseEnrollment(id='enr-course-1-stu-1', course_id='course-1', student_id='stu-1', enrolled_at='2026-08-01', status='active'),
+        CourseEnrollment(id='enr-course-1-stu-2', course_id='course-1', student_id='stu-2', enrolled_at='2026-08-01', status='active'),
+        CourseEnrollment(id='enr-course-1-stu-3', course_id='course-1', student_id='stu-3', enrolled_at='2026-08-01', status='active'),
+        CourseEnrollment(id='enr-course-1-stu-4', course_id='course-1', student_id='stu-4', enrolled_at='2026-08-01', status='active'),
+        CourseEnrollment(id='enr-course-1-stu-5', course_id='course-1', student_id='stu-5', enrolled_at='2026-08-01', status='active'),
+        CourseEnrollment(id='enr-course-1-stu-6', course_id='course-1', student_id='stu-6', enrolled_at='2026-08-01', status='active'),
+        CourseEnrollment(id='enr-course-1-stu-7', course_id='course-1', student_id='stu-7', enrolled_at='2026-08-01', status='active'),
+        CourseEnrollment(id='enr-course-1-stu-8', course_id='course-1', student_id='stu-8', enrolled_at='2026-08-01', status='active'),
+        CourseEnrollment(id='enr-course-1-stu-9', course_id='course-1', student_id='stu-9', enrolled_at='2026-08-01', status='active'),
+    ]
+    for enr in enrollments:
+        db.merge(enr)
+
+    # 5. Initial Attendance Records
     sample_signature = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="80"><path d="M20,50 Q60,10 90,45 T170,30" fill="none" stroke="%231a365d" stroke-width="4" stroke-linecap="round"/></svg>'
 
     attendances = [

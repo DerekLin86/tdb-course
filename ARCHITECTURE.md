@@ -159,6 +159,8 @@ npm run validate:pr
 | **老師端學生管理** | [`libs/ballet/feature/src/lib/admin/student-management/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/libs/ballet/feature/src/lib/admin/student-management/) |
 | **後端 FastAPI 主程式** | [`apps/api/main.py`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/main.py) |
 | **後端 SQLite 資料庫連線與環境防護** | [`apps/api/database.py`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/database.py) |
+| **期班學員註冊關聯模型** | [`apps/api/models/course_enrollment.py`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/models/course_enrollment.py) |
+| **期班學員註冊 Pydantic Schema** | [`apps/api/schemas/course_enrollment.py`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/schemas/course_enrollment.py) |
 | **後端 RESTful 路由群組** | [`apps/api/routers/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/routers/) |
 | **後端業務邏輯服務** | [`apps/api/services/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/services/) |
 | **後端 Pytest 整合測試** | [`apps/api/tests/`](file:///Users/derek.lin/GIT_POOL/triple-d-ballet-class/apps/api/tests/) |
@@ -231,4 +233,16 @@ Triple Dream Ballet 專案針對教室 iPad 現場與學員/老師手機端實�
 
 - **嚴禁破壞性操作**：在生產環境（`ENVIRONMENT=production`）下，Agent **絕不可**呼叫 `reset_db()` 或執行任何 `DROP TABLE` 破壞性操作。
 - **重置端點防護**：`POST /api/v1/system/reset` 於生產環境已內建攔截並一律回傳 `403 Forbidden`，防止任何自動化任務或外部請求誤刪正式營運數據。
+
+### 7.5 Agent SOP: Safe Relational Migration (期班名冊關聯平滑回填 SOP)
+
+當系統架構從「學員與單堂課綁定」演進升級為「學員與期班課程綁定 (`CourseEnrollment`)」時：
+
+1. **冪等回填保證 (`backfill_course_enrollments`)**：
+   - 於 `apps/api/database.py` 中實現自動回填函式，系統啟動時由 `init_db()` 自動執行。
+   - 透過 `INSERT INTO course_enrollments ... SELECT ... FROM attendance_records a JOIN class_sessions s ... WHERE NOT EXISTS (...)` 語法，將既有出勤紀錄之學員自動補齊為期班註冊。
+2. **生產環境零停機、零資料遺失**：
+   - 不修改亦不刪除任何既有 `attendance_records` 資料行。
+   - 所有歷史手寫簽名 Base64 圖檔、請假申請理由、扣堂紀錄與時間戳記 100% 完整保留。
+   - 若學員自期班移出名冊，僅清理尚未履約之 `registered`（待簽到）課堂，已簽名出席或請假之歷史紀錄永不遺失。
 

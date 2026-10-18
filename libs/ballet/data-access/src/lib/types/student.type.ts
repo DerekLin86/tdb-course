@@ -40,3 +40,15 @@ export interface UpdateStudentParams {
   phone: string;
   notes?: string;
 }
+
+export interface PurchaseTicketPackParams {
+  studentId: string;
+  type: TicketPackType;
+  totalCount?: number;
+  validityDays?: number;
+  pricePaid?: number;
+}
+
+export interface ExtendTicketPackParams {
+  extraDays?: number;
+}

@@ -45,8 +45,6 @@ class ColumnExpr:
             placeholders = ", ".join("?" for _ in self.val)
             params.extend(self.val)
             return f"{self.col_name} IN ({placeholders})"
-        elif isinstance(self.val, Column):
-            return f"{self.col_name} {self.op} {self.val.name}"
         else:
             params.append(self.val)
             return f"{self.col_name} {self.op} ?"
@@ -55,44 +53,26 @@ class ColumnExpr:
 class OrderByExpr:
     def __init__(self, col_name: str, direction: str = "ASC"):
         self.col_name = col_name
-        self.direction = direction.upper()
+        self.direction = direction
 
     def to_sql(self) -> str:
         return f"{self.col_name} {self.direction}"
 
 
-def desc(col: Union[Column, OrderByExpr, str]) -> OrderByExpr:
-    if isinstance(col, Column):
-        return OrderByExpr(col.name, "DESC")
-    elif isinstance(col, OrderByExpr):
-        col.direction = "DESC"
-        return col
-    elif isinstance(col, str):
-        if " " in col:
-            parts = col.split()
-            return OrderByExpr(parts[0], parts[1])
-        return OrderByExpr(col, "DESC")
-    return OrderByExpr(str(col), "DESC")
+def desc(col_expr: Any) -> OrderByExpr:
+    col_name = col_expr.name if hasattr(col_expr, "name") else str(col_expr)
+    return OrderByExpr(col_name, "DESC")
 
 
-def asc(col: Union[Column, OrderByExpr, str]) -> OrderByExpr:
-    if isinstance(col, Column):
-        return OrderByExpr(col.name, "ASC")
-    elif isinstance(col, OrderByExpr):
-        col.direction = "ASC"
-        return col
-    elif isinstance(col, str):
-        if " " in col:
-            parts = col.split()
-            return OrderByExpr(parts[0], parts[1])
-        return OrderByExpr(col, "ASC")
-    return OrderByExpr(str(col), "ASC")
+def asc(col_expr: Any) -> OrderByExpr:
+    col_name = col_expr.name if hasattr(col_expr, "name") else str(col_expr)
+    return OrderByExpr(col_name, "ASC")
 
 
 class Column:
     def __init__(
         self,
-        col_type: Any,
+        col_type: Any = None,
         primary_key: bool = False,
         nullable: bool = True,
         default: Any = None,
@@ -181,16 +161,8 @@ class Relationship:
     def __set_name__(self, owner, name):
         self.name = name
 
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        return getattr(instance, f"_{self.name}", None)
-
-    def __set__(self, instance, value):
-        setattr(instance, f"_{self.name}", value)
-
-def relationship(target: str, back_populates: Optional[str] = None, cascade: Optional[str] = None, order_by: Optional[str] = None) -> Relationship:
-    return Relationship(target, back_populates=back_populates, cascade=cascade, order_by=order_by)
+def relationship(target_model: str, back_populates: Optional[str] = None, cascade: Optional[str] = None, order_by: Optional[str] = None) -> Relationship:
+    return Relationship(target_model, back_populates=back_populates, cascade=cascade, order_by=order_by)
 
 
 class Metadata:
@@ -202,68 +174,83 @@ class Metadata:
             self.tables[model_cls.__tablename__] = model_cls
 
     def create_all(self, bind: Engine):
-        conn = bind.get_connection()
-        cur = conn.cursor()
-        for tablename, model_cls in self.tables.items():
-            col_defs = []
-            fk_defs = []
-            pk_col = None
-            for col_name, col in model_cls._columns.items():
-                sqlite_type = "TEXT"
-                if isinstance(col.col_type, Integer) or col.col_type is Integer:
-                    sqlite_type = "INTEGER"
+        with bind._lock:
+            conn = bind.get_connection()
+            cur = conn.cursor()
+            for table_name, model_cls in self.tables.items():
+                cols = dict(getattr(model_cls, "_columns", {}))
+                if not cols:
+                    for k, v in model_cls.__dict__.items():
+                        if isinstance(v, Column):
+                            cols[k] = v
+                    model_cls._columns = cols
+                if not cols:
+                    continue
+                col_defs = []
+                for name, col in cols.items():
+                    sqlite_type = "TEXT"
+                    if isinstance(col.col_type, Integer):
+                        sqlite_type = "INTEGER"
+                    elif isinstance(col.col_type, (String, Text, DateTime)):
+                        sqlite_type = "TEXT"
+                    
+                    constraints = []
+                    if col.primary_key:
+                        constraints.append("PRIMARY KEY")
+                    if not col.nullable and not col.primary_key:
+                        constraints.append("NOT NULL")
+                    if col.unique and not col.primary_key:
+                        constraints.append("UNIQUE")
+                    
+                    default_val = ""
+                    if col.default is not None and not callable(col.default):
+                        if isinstance(col.default, str):
+                            default_val = f" DEFAULT '{col.default}'"
+                        elif isinstance(col.default, (int, float)):
+                            default_val = f" DEFAULT {col.default}"
 
-                parts = [col_name, sqlite_type]
-                if col.primary_key:
-                    parts.append("PRIMARY KEY")
-                    pk_col = col_name
-                if not col.nullable and not col.primary_key:
-                    parts.append("NOT NULL")
-                if col.unique and not col.primary_key:
-                    parts.append("UNIQUE")
+                    col_defs.append(f"{name} {sqlite_type}{' ' + ' '.join(constraints) if constraints else ''}{default_val}")
 
-                col_defs.append(" ".join(parts))
-
-                if col.foreign_key:
-                    # e.g. students.id
-                    target_table, target_col = col.foreign_key.target.split(".")
-                    fk_clause = f"FOREIGN KEY ({col_name}) REFERENCES {target_table}({target_col})"
-                    if col.foreign_key.ondelete:
-                        fk_clause += f" ON DELETE {col.foreign_key.ondelete.upper()}"
-                    fk_defs.append(fk_clause)
-
-            table_constraints = []
-            if hasattr(model_cls, "__table_args__"):
-                for arg in model_cls.__table_args__:
+                # Unique constraints
+                table_args = getattr(model_cls, "__table_args__", ())
+                for arg in table_args:
                     if isinstance(arg, UniqueConstraint):
                         cols_str = ", ".join(arg.columns)
-                        table_constraints.append(f"UNIQUE ({cols_str})")
+                        name_str = f"CONSTRAINT {arg.name} " if arg.name else ""
+                        col_defs.append(f"{name_str}UNIQUE ({cols_str})")
 
-            all_defs = col_defs + fk_defs + table_constraints
-            create_sql = f"CREATE TABLE IF NOT EXISTS {tablename} ({', '.join(all_defs)});"
-            cur.execute(create_sql)
+                create_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(col_defs)});"
+                cur.execute(create_sql)
 
-            # Auto-migration: check for missing columns in existing table and dynamically alter table
-            cur.execute(f"PRAGMA table_info({tablename});")
-            existing_cols = {row["name"] for row in cur.fetchall()}
-            for col_name, col in model_cls._columns.items():
-                if col_name not in existing_cols:
-                    sqlite_type = "TEXT"
-                    if isinstance(col.col_type, Integer) or col.col_type is Integer:
-                        sqlite_type = "INTEGER"
-                    alter_sql = f"ALTER TABLE {tablename} ADD COLUMN {col_name} {sqlite_type};"
-                    cur.execute(alter_sql)
+                # Lightweight auto-migration: add any missing columns without data loss
+                cur.execute(f"PRAGMA table_info({table_name});")
+                existing_cols = {row["name"] for row in cur.fetchall()}
+                for name, col in cols.items():
+                    if name not in existing_cols:
+                        sqlite_type = "TEXT"
+                        if isinstance(col.col_type, Integer):
+                            sqlite_type = "INTEGER"
+                        default_clause = ""
+                        if col.default is not None and not callable(col.default):
+                            if isinstance(col.default, str):
+                                default_clause = f" DEFAULT '{col.default}'"
+                            elif isinstance(col.default, (int, float)):
+                                default_clause = f" DEFAULT {col.default}"
+                        alter_sql = f"ALTER TABLE {table_name} ADD COLUMN {name} {sqlite_type}{default_clause};"
+                        cur.execute(alter_sql)
 
-        conn.commit()
+            conn.commit()
 
     def drop_all(self, bind: Engine):
-        conn = bind.get_connection()
-        cur = conn.cursor()
-        cur.execute("PRAGMA foreign_keys = OFF;")
-        for tablename in list(self.tables.keys()):
-            cur.execute(f"DROP TABLE IF EXISTS {tablename};")
-        cur.execute("PRAGMA foreign_keys = ON;")
-        conn.commit()
+        with bind._lock:
+            conn = bind.get_connection()
+            cur = conn.cursor()
+            for table_name in reversed(list(self.tables.keys())):
+                cur.execute(f"DROP TABLE IF EXISTS {table_name};")
+            conn.commit()
+
+
+default_metadata = Metadata()
 
 
 class ModelMeta(type):
@@ -271,199 +258,169 @@ class ModelMeta(type):
         columns = {}
         for k, v in list(namespace.items()):
             if isinstance(v, Column):
-                v.name = k
                 columns[k] = v
-            elif isinstance(v, Relationship):
-                pass
+        namespace["_columns"] = columns
         cls = super().__new__(mcs, name, bases, namespace)
-        cls._columns = columns
-        if bases != (object,) and hasattr(cls, "_metadata") and cls._metadata:
-            cls._metadata.register(cls)
+        default_metadata.register(cls)
         return cls
 
 
-class BaseModel(metaclass=ModelMeta):
+class BaseModel:
     _columns: Dict[str, Column] = {}
-    _metadata: Optional[Metadata] = None
     __tablename__: str = ""
 
     def __init__(self, **kwargs):
-        # Set column defaults
-        for col_name, col in self._columns.items():
-            if col_name in kwargs:
-                setattr(self, col_name, kwargs[col_name])
+        for k, col in self._columns.items():
+            if k in kwargs:
+                setattr(self, k, kwargs[k])
             else:
-                if callable(col.default):
-                    setattr(self, col_name, col.default())
-                else:
-                    setattr(self, col_name, col.default)
-        # Set any extra attributes
-        for k, v in kwargs.items():
-            if k not in self._columns:
-                setattr(self, k, v)
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {col_name: getattr(self, col_name, None) for col_name in self._columns}
-
-    def __repr__(self):
-        pk_val = getattr(self, 'id', None)
-        return f"<{self.__class__.__name__} id={pk_val}>"
+                default = col.default
+                if callable(default):
+                    default = default()
+                setattr(self, k, default)
 
 
-metadata = Metadata()
-BaseModel._metadata = metadata
-
-def declarative_base():
-    class DeclarativeBase(BaseModel):
-        pass
-    DeclarativeBase.metadata = metadata
-    return DeclarativeBase
-
-Base = declarative_base()
+class Base(BaseModel, metaclass=ModelMeta):
+    metadata = default_metadata
 
 
-class SelectStatement:
-    def __init__(self, model_cls: Type[BaseModel]):
-        self.model_cls = model_cls
-        self.where_exprs: List[ColumnExpr] = []
-        self.order_by_exprs: List[OrderByExpr] = []
-
-    def where(self, *exprs) -> SelectStatement:
-        for expr in exprs:
-            if isinstance(expr, ColumnExpr):
-                self.where_exprs.append(expr)
-        return self
-
-    def order_by(self, *exprs) -> SelectStatement:
-        for expr in exprs:
-            if isinstance(expr, OrderByExpr):
-                self.order_by_exprs.append(expr)
-            elif isinstance(expr, Column):
-                self.order_by_exprs.append(OrderByExpr(expr.name, "ASC"))
-            elif isinstance(expr, str):
-                self.order_by_exprs.append(desc(expr) if 'desc' in expr.lower() else asc(expr))
-        return self
-
-
-def select(model_cls: Type[BaseModel]) -> SelectStatement:
-    return SelectStatement(model_cls)
-
-
-class ScalarResult(Generic[T]):
-    def __init__(self, items: List[T]):
-        self._items = items
-
-    def all(self) -> List[T]:
-        return list(self._items)
-
-    def first(self) -> Optional[T]:
-        return self._items[0] if self._items else None
-
-    def __iter__(self):
-        return iter(self._items)
-
-
-class Query(Generic[T]):
+class SelectQuery(Generic[T]):
     def __init__(self, model_cls: Type[T], session: Session):
         self.model_cls = model_cls
         self.session = session
-        self.where_exprs: List[ColumnExpr] = []
-        self.order_by_exprs: List[OrderByExpr] = []
+        self._where_clauses: List[ColumnExpr] = []
+        self._order_by: List[OrderByExpr] = []
+        self._limit: Optional[int] = None
+        self._offset: Optional[int] = None
 
-    def filter(self, *exprs) -> Query[T]:
-        for expr in exprs:
-            if isinstance(expr, ColumnExpr):
-                self.where_exprs.append(expr)
+    def where(self, *clauses: ColumnExpr) -> SelectQuery[T]:
+        self._where_clauses.extend(clauses)
         return self
 
-    def order_by(self, *exprs) -> Query[T]:
-        for expr in exprs:
+    def filter(self, *clauses: ColumnExpr) -> SelectQuery[T]:
+        return self.where(*clauses)
+
+    def order_by(self, *order_exprs: Union[OrderByExpr, Any]) -> SelectQuery[T]:
+        for expr in order_exprs:
             if isinstance(expr, OrderByExpr):
-                self.order_by_exprs.append(expr)
-            elif isinstance(expr, Column):
-                self.order_by_exprs.append(OrderByExpr(expr.name, "ASC"))
-            elif isinstance(expr, str):
-                self.order_by_exprs.append(desc(expr) if 'desc' in expr.lower() else asc(expr))
+                self._order_by.append(expr)
+            elif isinstance(expr, str) and expr.startswith("desc(") and expr.endswith(")"):
+                col_name = expr[5:-1].split(".")[-1]
+                self._order_by.append(OrderByExpr(col_name, "DESC"))
+            elif hasattr(expr, "name"):
+                self._order_by.append(OrderByExpr(expr.name, "ASC"))
         return self
 
-    def _build_sql(self) -> tuple[str, list]:
-        tablename = self.model_cls.__tablename__
-        sql = f"SELECT * FROM {tablename}"
-        params = []
-        if self.where_exprs:
-            clauses = [e.to_sql(params) for e in self.where_exprs]
-            sql += " WHERE " + " AND ".join(clauses)
-        if self.order_by_exprs:
-            clauses = [e.to_sql() for e in self.order_by_exprs]
-            sql += " ORDER BY " + ", ".join(clauses)
-        return sql, params
+    def limit(self, n: int) -> SelectQuery[T]:
+        self._limit = n
+        return self
 
-    def all(self) -> List[T]:
-        sql, params = self._build_sql()
+    def offset(self, n: int) -> SelectQuery[T]:
+        self._offset = n
+        return self
+
+    def _execute(self) -> List[sqlite3.Row]:
+        sql = f"SELECT * FROM {self.model_cls.__tablename__}"
+        params: list = []
+        if self._where_clauses:
+            where_strs = [c.to_sql(params) for c in self._where_clauses]
+            sql += " WHERE " + " AND ".join(where_strs)
+
+        if self._order_by:
+            order_strs = [o.to_sql() for o in self._order_by]
+            sql += " ORDER BY " + ", ".join(order_strs)
+
+        if self._limit is not None:
+            sql += f" LIMIT {self._limit}"
+        if self._offset is not None:
+            sql += f" OFFSET {self._offset}"
+
         with self.session.engine._lock:
             conn = self.session.engine.get_connection()
             cur = conn.cursor()
             cur.execute(sql, params)
-            rows = cur.fetchall()
-            result = []
-            for row in rows:
-                obj = self.model_cls(**dict(row))
-                self.session._identity_map[(self.model_cls, getattr(obj, 'id', id(obj)))] = obj
-                result.append(obj)
-            return result
+            return cur.fetchall()
+
+    def all(self) -> List[T]:
+        rows = self._execute()
+        results = []
+        for row in rows:
+            inst = self.session._get_or_create_instance(self.model_cls, dict(row))
+            results.append(inst)
+        return results
 
     def first(self) -> Optional[T]:
-        items = self.all()
-        return items[0] if items else None
+        self._limit = 1
+        res = self.all()
+        return res[0] if res else None
 
     def count(self) -> int:
-        tablename = self.model_cls.__tablename__
-        sql = f"SELECT COUNT(*) FROM {tablename}"
-        params = []
-        if self.where_exprs:
-            clauses = [e.to_sql(params) for e in self.where_exprs]
-            sql += " WHERE " + " AND ".join(clauses)
+        sql = f"SELECT COUNT(*) as cnt FROM {self.model_cls.__tablename__}"
+        params: list = []
+        if self._where_clauses:
+            where_strs = [c.to_sql(params) for c in self._where_clauses]
+            sql += " WHERE " + " AND ".join(where_strs)
         with self.session.engine._lock:
             conn = self.session.engine.get_connection()
             cur = conn.cursor()
             cur.execute(sql, params)
             row = cur.fetchone()
-            return row[0] if row else 0
+            return row["cnt"] if row else 0
+
+
+def select(model_cls: Type[T]) -> SelectQuery[T]:
+    # Will be bound to session when executed via db.scalars(...)
+    return SelectQuery(model_cls, session=None)  # type: ignore[arg-type]
 
 
 class Session:
     def __init__(self, engine: Engine):
         self.engine = engine
         self._new: List[BaseModel] = []
-        self._dirty: Set[BaseModel] = set()
         self._deleted: List[BaseModel] = []
         self._identity_map: Dict[tuple, BaseModel] = {}
 
-    def query(self, model_cls: Type[T]) -> Query[T]:
-        return Query(model_cls, self)
+    def _get_or_create_instance(self, model_cls: Type[T], row_dict: dict) -> T:
+        pk_val = row_dict.get("id")
+        key = (model_cls.__tablename__, pk_val)
+        if key in self._identity_map:
+            inst = self._identity_map[key]
+            for k, v in row_dict.items():
+                setattr(inst, k, v)
+            return inst  # type: ignore[return-value]
+        inst = model_cls(**row_dict)
+        if pk_val is not None:
+            self._identity_map[key] = inst
+        return inst
 
-    def select(self, model_cls: Type[T]) -> SelectStatement:
-        return SelectStatement(model_cls)
+    def query(self, model_cls: Type[T]) -> SelectQuery[T]:
+        return SelectQuery(model_cls, session=self)
 
-    def scalars(self, stmt: SelectStatement) -> ScalarResult[Any]:
-        q = Query(stmt.model_cls, self)
-        q.where_exprs = list(stmt.where_exprs)
-        q.order_by_exprs = list(stmt.order_by_exprs)
-        return ScalarResult(q.all())
+    def scalars(self, query: SelectQuery[T]) -> SelectQuery[T]:
+        query.session = self
+        return query
 
     def get(self, model_cls: Type[T], ident: Any) -> Optional[T]:
-        key = (model_cls, ident)
+        key = (model_cls.__tablename__, ident)
         if key in self._identity_map:
-            return self._identity_map[key]  # type: ignore
-        return self.query(model_cls).filter(model_cls._columns['id'] == ident).first()
+            return self._identity_map[key]  # type: ignore[return-value]
+        with self.engine._lock:
+            conn = self.engine.get_connection()
+            cur = conn.cursor()
+            cur.execute(f"SELECT * FROM {model_cls.__tablename__} WHERE id = ?", (ident,))
+            row = cur.fetchone()
+            if not row:
+                return None
+            return self._get_or_create_instance(model_cls, dict(row))
 
     def add(self, instance: BaseModel):
-        if instance not in self._new and instance not in self._dirty:
+        if instance not in self._new:
             self._new.append(instance)
-            if hasattr(instance, 'id'):
-                self._identity_map[(instance.__class__, instance.id)] = instance
+            pk = getattr(instance, 'id', None)
+            if pk is not None:
+                self._identity_map[(instance.__tablename__, pk)] = instance
 
-    def add_all(self, instances: List[BaseModel]):
+    def add_all(self, instances: list):
         for inst in instances:
             self.add(inst)
 
@@ -472,31 +429,32 @@ class Session:
         return instance
 
     def delete(self, instance: BaseModel):
-        self._deleted.append(instance)
         if instance in self._new:
             self._new.remove(instance)
-        if hasattr(instance, 'id'):
-            key = (instance.__class__, instance.id)
-            if key in self._identity_map:
-                del self._identity_map[key]
+        if instance not in self._deleted:
+            self._deleted.append(instance)
 
     def commit(self):
         with self.engine._lock:
             conn = self.engine.get_connection()
             cur = conn.cursor()
 
-            # Handle deletes
-            for inst in self._deleted:
+            deleted_keys = set()
+            for inst in list(self._deleted):
                 pk = getattr(inst, 'id', None)
                 if pk is not None:
+                    key = (inst.__class__.__tablename__, pk)
+                    deleted_keys.add(key)
                     cur.execute(f"DELETE FROM {inst.__tablename__} WHERE id = ?", (pk,))
+                    self._identity_map.pop(key, None)
             self._deleted.clear()
 
-            # Handle new & dirty (upsert via sqlite3)
-            to_save = list(self._new) + list(self._identity_map.values())
             seen_ids = set()
-
-            for inst in to_save:
+            all_instances = [
+                inst for inst in list(self._identity_map.values()) + list(self._new)
+                if (inst.__class__.__tablename__, getattr(inst, 'id', None)) not in deleted_keys
+            ]
+            for inst in all_instances:
                 pk = getattr(inst, 'id', None)
                 if not pk:
                     continue
@@ -568,7 +526,6 @@ class Engine:
     def get_connection(self) -> sqlite3.Connection:
         db_path = self.url.replace("sqlite:////", "/").replace("sqlite:///:memory:", ":memory:").replace("sqlite:///", "")
 
-        # In-memory database connection (shared across threads safely via self._lock)
         if db_path == ":memory:":
             with self._lock:
                 if self._memory_conn is None:
@@ -580,7 +537,6 @@ class Engine:
                     self._memory_conn = conn
                 return self._memory_conn
 
-        # File-based database: thread-local connection with WAL mode & busy timeout
         if not hasattr(self._local, "conn") or self._local.conn is None:
             check_same_thread = self.connect_args.get("check_same_thread", False)
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -658,16 +614,54 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def backfill_course_enrollments(engine: Engine) -> int:
+    """Idempotently backfills course_enrollments from existing attendance_records and class_sessions.
+    Ensures PROD zero-downtime, zero-data-loss, and preserves all signatures and histories.
+    """
+    with engine._lock:
+        conn = engine.get_connection()
+        cur = conn.cursor()
+        backfill_sql = """
+        INSERT INTO course_enrollments (id, course_id, student_id, enrolled_at, status, created_at, updated_at)
+        SELECT 
+            'enr-' || s.course_id || '-' || a.student_id AS id,
+            s.course_id,
+            a.student_id,
+            COALESCE(SUBSTR(MIN(a.created_at), 1, 10), strftime('%Y-%m-%d', 'now')) AS enrolled_at,
+            'active' AS status,
+            strftime('%Y-%m-%dT%H:%M:%f', 'now') AS created_at,
+            strftime('%Y-%m-%dT%H:%M:%f', 'now') AS updated_at
+        FROM attendance_records a
+        JOIN class_sessions s ON a.session_id = s.id
+        WHERE s.course_id IS NOT NULL 
+          AND s.course_id != ''
+          AND NOT EXISTS (
+              SELECT 1 FROM course_enrollments ce
+              WHERE ce.course_id = s.course_id AND ce.student_id = a.student_id
+          )
+        GROUP BY s.course_id, a.student_id;
+        """
+        cur.execute(backfill_sql)
+        inserted_rows = cur.rowcount
+        conn.commit()
+        return inserted_rows
+
+
 def init_db(seed: bool = True, force_seed: bool = False) -> None:
     """Initialize database tables and optionally seed mock data."""
-    # Import models here to register metadata
     from models.student import Student, TicketPack
     from models.session import ClassSession
     from models.attendance import AttendanceRecord
     from models.course import Course
+    from models.course_enrollment import CourseEnrollment
     from seed import seed_mock_data
 
     Base.metadata.create_all(bind=engine)
+    try:
+        backfill_course_enrollments(engine)
+    except Exception as e:
+        print(f"Warning: backfill_course_enrollments skipped or failed: {e}")
+
     if is_production() and not force_seed:
         return
 
@@ -686,8 +680,8 @@ def reset_db() -> None:
     from models.session import ClassSession
     from models.attendance import AttendanceRecord
     from models.course import Course
+    from models.course_enrollment import CourseEnrollment
 
     Base.metadata.drop_all(bind=engine)
     engine.close_all()
     init_db(seed=True, force_seed=True)
-

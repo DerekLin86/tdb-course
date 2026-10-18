@@ -143,3 +143,25 @@ export interface StudentCourseProgress {
   attendanceRate: number; // 出席率百分比 (0 ~ 100)
   sessionDetails: StudentCourseSessionDetail[];
 }
+
+export interface CourseEnrollment {
+  id: string;
+  courseId: string;
+  studentId: string;
+  enrolledAt: string;
+  status: 'active' | 'dropped' | 'completed';
+  createdAt?: string;
+  student?: any;
+}
+
+export interface EnrollStudentInCourseRequest {
+  studentId: string;
+  enrolledAt?: string;
+}
+
+export interface DeleteCourseEnrollmentResponse {
+  success: boolean;
+  message: string;
+  removedScheduledCount: number;
+  preservedAttendedCount: number;
+}

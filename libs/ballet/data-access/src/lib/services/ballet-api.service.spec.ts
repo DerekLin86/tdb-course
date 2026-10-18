@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { BalletApiService, BALLET_API_BASE_URL } from './ballet-api.service';
 import { StudentWithActivePack, TicketPack } from '../types/student.type';
-import { ClassSession, AttendanceRecord, SessionFinancialStats, Course } from '../types/attendance.type';
+import { ClassSession, AttendanceRecord, SessionFinancialStats, Course, CreateCourseParams } from '../types/attendance.type';
 import {
   CheckInResponse,
   LeaveResponse,
@@ -170,14 +170,13 @@ describe('BalletApiService', () => {
     });
 
     it('createCourse() 應發送 POST 請求至 /courses', () => {
-      const payload: Partial<Course> = {
+      const payload: CreateCourseParams = {
         title: '成人芭蕾進階硬鞋班',
         totalSessions: 10,
         defaultVenueCost: 2500,
         defaultTeacherFee: 1500,
         defaultFeePerStudent: 600,
         minThreshold: 4,
-        status: 'active'
       };
       const mockCourse: Course = {
         id: 'course-new',

@@ -12,7 +12,10 @@ import {
   CourseFinancialStats,
   CreateCourseParams,
   StudentCourseProgress,
-  StudentCourseSessionDetail
+  StudentCourseSessionDetail,
+  CourseEnrollment,
+  EnrollStudentInCourseRequest,
+  DeleteCourseEnrollmentResponse
 } from '../types/attendance.type';
 import { BalletApiService } from './ballet-api.service';
 
@@ -30,6 +33,29 @@ export class BalletStateService {
   readonly ticketPacks = signal<TicketPack[]>([]);
   readonly sessions = signal<ClassSession[]>([]);
   readonly attendance = signal<AttendanceRecord[]>([]);
+  readonly courseEnrollments = signal<CourseEnrollment[]>([]);
+
+  // 當前課程學員名冊 Computed
+  readonly currentCourseEnrollments = computed(() => {
+    const course = this.currentCourse();
+    if (!course) return [];
+    return this.courseEnrollments().filter(e => e.courseId === course.id && e.status === 'active');
+  });
+
+  readonly currentCourseEnrolledStudents = computed(() => {
+    const enrs = this.currentCourseEnrollments();
+    const students = this.students();
+    const packs = this.ticketPacks();
+    return enrs.map(e => {
+      const stu = students.find(s => s.id === e.studentId);
+      const activePack = packs.find(p => p.studentId === e.studentId && p.status === 'active');
+      return {
+        enrollment: e,
+        student: stu,
+        activePack
+      };
+    });
+  });
 
   // 遠端同步 Signals
   readonly isSyncing = signal<boolean>(false);
@@ -211,15 +237,41 @@ export class BalletStateService {
     return this.sessions().find(s => s.id === id) || this.sessions()[0];
   });
 
-  // 6. 當前課堂所有學生簽到記錄 Computed
+  // 6. 當前課堂所有學生簽到記錄 Computed (若課堂屬於期班，動態自動投影期班名冊)
   readonly currentSessionAttendance = computed(() => {
     const curr = this.currentSession();
     if (!curr) return [];
-    const records = this.attendance().filter(a => a.sessionId === curr.id);
+    const allRecords = this.attendance();
+    const existingSessionRecords = allRecords.filter(a => a.sessionId === curr.id);
     const stuList = this.students();
     const packList = this.ticketPacks();
 
-    return records.map(rec => {
+    const recordMap = new Map<string, AttendanceRecord>();
+    for (const rec of existingSessionRecords) {
+      recordMap.set(rec.studentId, rec);
+    }
+
+    if (curr.courseId) {
+      const enrolled = this.courseEnrollments().filter(
+        e => e.courseId === curr.courseId && e.status === 'active'
+      );
+      for (const enr of enrolled) {
+        if (!recordMap.has(enr.studentId)) {
+          const stu = stuList.find(s => s.id === enr.studentId);
+          recordMap.set(enr.studentId, {
+            id: `att-${curr.id}-${enr.studentId}`,
+            sessionId: curr.id,
+            studentId: enr.studentId,
+            studentName: stu?.name || '期班學員',
+            status: 'registered',
+            deductedCount: 0,
+            remark: '期班報名自動帶入課堂名冊'
+          });
+        }
+      }
+    }
+
+    return Array.from(recordMap.values()).map(rec => {
       const stu = stuList.find(s => s.id === rec.studentId) || { id: rec.studentId, name: rec.studentName || '未知名稱', phone: '', registeredAt: '' };
       const activePack = packList.find(p => p.studentId === rec.studentId && p.status === 'active');
 
@@ -722,12 +774,109 @@ export class BalletStateService {
     }
   }
 
-  // 手動將學員加入指定課堂名冊
+  // 將學員加入期班名冊（全期課堂自動同步登錄名冊）
+  enrollStudentInCourse(courseId: string, studentId: string): CourseEnrollment | null {
+    const course = this.courses().find(c => c.id === courseId);
+    if (!course) return null;
+    const student = this.students().find(s => s.id === studentId);
+    if (!student) return null;
+
+    const existingEnr = this.courseEnrollments().find(
+      e => e.courseId === courseId && e.studentId === studentId
+    );
+
+    let enrRecord: CourseEnrollment;
+    if (existingEnr) {
+      if (existingEnr.status !== 'active') {
+        enrRecord = { ...existingEnr, status: 'active' };
+        this.courseEnrollments.set(
+          this.courseEnrollments().map(e => e.id === existingEnr.id ? enrRecord : e)
+        );
+      } else {
+        enrRecord = existingEnr;
+      }
+    } else {
+      const today = new Date().toISOString().slice(0, 10);
+      enrRecord = {
+        id: `enr-${courseId}-${studentId}`,
+        courseId,
+        studentId,
+        enrolledAt: today,
+        status: 'active'
+      };
+      this.courseEnrollments.set([...this.courseEnrollments(), enrRecord]);
+    }
+
+    // 同步該期班現存所有課堂名冊
+    const courseSessions = this.sessions().filter(s => s.courseId === courseId);
+    const existingAtts = this.attendance();
+    const newAtts: AttendanceRecord[] = [];
+
+    for (const s of courseSessions) {
+      const hasAtt = existingAtts.some(a => a.sessionId === s.id && a.studentId === studentId);
+      if (!hasAtt) {
+        newAtts.push({
+          id: `att-${s.id}-${studentId}`,
+          sessionId: s.id,
+          studentId,
+          studentName: student.name,
+          status: 'registered',
+          deductedCount: 0,
+          remark: '期班報名自動登錄課堂名冊'
+        });
+      }
+    }
+
+    if (newAtts.length > 0) {
+      this.attendance.set([...this.attendance(), ...newAtts]);
+    }
+
+    if (this.api?.isAvailable) {
+      this.api.enrollStudentInCourse(courseId, { studentId }).subscribe({
+        error: (err) => console.warn('Background enrollStudentInCourse failed', err)
+      });
+    }
+
+    return enrRecord;
+  }
+
+  // 自期班名冊移出學員（安全清除未履約之 registered 堂數，完整保留歷史簽到與請假）
+  removeStudentFromCourse(courseId: string, studentId: string): void {
+    const course = this.courses().find(c => c.id === courseId);
+    if (!course) return;
+
+    this.courseEnrollments.set(
+      this.courseEnrollments().filter(e => !(e.courseId === courseId && e.studentId === studentId))
+    );
+
+    const sessionIds = new Set(this.sessions().filter(s => s.courseId === courseId).map(s => s.id));
+
+    this.attendance.set(
+      this.attendance().filter(a => {
+        if (a.studentId === studentId && sessionIds.has(a.sessionId)) {
+          return a.status !== 'registered';
+        }
+        return true;
+      })
+    );
+
+    if (this.api?.isAvailable) {
+      this.api.removeStudentFromCourse(courseId, studentId).subscribe({
+        error: (err) => console.warn('Background removeStudentFromCourse failed', err)
+      });
+    }
+  }
+
+  // 手動將學員加入指定課堂名冊（相容舊介面，若所屬期班則同步註冊期班）
   enrollStudentInSession(sessionId: string, studentId: string): AttendanceRecord | null {
     const session = this.sessions().find(s => s.id === sessionId);
     if (!session) return null;
     const student = this.students().find(s => s.id === studentId);
     if (!student) return null;
+
+    if (session.courseId) {
+      this.enrollStudentInCourse(session.courseId, studentId);
+    }
 
     // 檢查是否已在名冊中
     const existing = this.attendance().find(a => a.sessionId === sessionId && a.studentId === studentId);
@@ -1292,6 +1441,26 @@ export class BalletStateService {
 
     if (newSession.courseId) {
       this.selectedCourseId.set(newSession.courseId);
+      // 自動繼承期班名冊已註冊學員
+      const enrolled = this.courseEnrollments().filter(
+        e => e.courseId === newSession.courseId && e.status === 'active'
+      );
+      const stuList = this.students();
+      const newAtts: AttendanceRecord[] = enrolled.map(enr => {
+        const stu = stuList.find(s => s.id === enr.studentId);
+        return {
+          id: `att-${newSession.id}-${enr.studentId}`,
+          sessionId: newSession.id,
+          studentId: enr.studentId,
+          studentName: stu?.name || '期班學員',
+          status: 'registered',
+          deductedCount: 0,
+          remark: '期班建立課堂自動帶入名冊'
+        };
+      });
+      if (newAtts.length > 0) {
+        this.attendance.set([...this.attendance(), ...newAtts]);
+      }
     }
 
     // 背景非同步同步至後端 API
@@ -1586,7 +1755,20 @@ export class BalletStateService {
       }))
     ];
 
+    const initialCourseEnrollments: CourseEnrollment[] = [
+      { id: 'enr-course-1-stu-1', courseId: 'course-1', studentId: 'stu-1', enrolledAt: '2026-08-01', status: 'active' },
+      { id: 'enr-course-1-stu-2', courseId: 'course-1', studentId: 'stu-2', enrolledAt: '2026-08-01', status: 'active' },
+      { id: 'enr-course-1-stu-3', courseId: 'course-1', studentId: 'stu-3', enrolledAt: '2026-08-01', status: 'active' },
+      { id: 'enr-course-1-stu-4', courseId: 'course-1', studentId: 'stu-4', enrolledAt: '2026-08-01', status: 'active' },
+      { id: 'enr-course-1-stu-5', courseId: 'course-1', studentId: 'stu-5', enrolledAt: '2026-08-01', status: 'active' },
+      { id: 'enr-course-1-stu-6', courseId: 'course-1', studentId: 'stu-6', enrolledAt: '2026-08-01', status: 'active' },
+      { id: 'enr-course-1-stu-7', courseId: 'course-1', studentId: 'stu-7', enrolledAt: '2026-08-01', status: 'active' },
+      { id: 'enr-course-1-stu-8', courseId: 'course-1', studentId: 'stu-8', enrolledAt: '2026-08-01', status: 'active' },
+      { id: 'enr-course-1-stu-9', courseId: 'course-1', studentId: 'stu-9', enrolledAt: '2026-08-01', status: 'active' },
+    ];
+
     this.courses.set(initialCourses);
+    this.courseEnrollments.set(initialCourseEnrollments);
     this.selectedCourseId.set('course-1');
     this.students.set(initialStudents);
     this.ticketPacks.set(initialPacks);
