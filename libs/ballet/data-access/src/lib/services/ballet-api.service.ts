@@ -2,7 +2,7 @@ import { Injectable, InjectionToken, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of, throwError } from 'rxjs';
 import { Student, StudentWithActivePack, TicketPack } from '../types/student.type';
-import { AttendanceRecord, AttendanceStatus, ClassSession, SessionFinancialStats } from '../types/attendance.type';
+import { AttendanceRecord, AttendanceStatus, ClassSession, Course, SessionFinancialStats } from '../types/attendance.type';
 import {
   CheckInResponse,
   LeaveResponse,
@@ -62,6 +62,17 @@ export class BalletApiService {
   extendTicketPack(packId: string, extraDays = 30): Observable<TicketPack> {
     if (!this.http) return throwError(() => new Error('HttpClient not available'));
     return this.http.patch<TicketPack>(`${this.baseUrl}/ticket-packs/${packId}/extend`, { extraDays });
+  }
+
+  // 1.5. Courses
+  getCourses(): Observable<Course[]> {
+    if (!this.http) return of([]);
+    return this.http.get<Course[]>(`${this.baseUrl}/courses`);
+  }
+
+  createCourse(payload: Partial<Course>): Observable<Course> {
+    if (!this.http) return throwError(() => new Error('HttpClient not available'));
+    return this.http.post<Course>(`${this.baseUrl}/courses`, payload);
   }
 
   // 2. Class Sessions & Financials

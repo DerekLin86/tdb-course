@@ -22,6 +22,12 @@ from .session import (
     CancelThresholdRequest,
     CancelThresholdResponse,
 )
+from .course import (
+    CourseBase,
+    CourseCreate,
+    CourseUpdate,
+    CourseResponse,
+)
 from .attendance import (
     AttendanceStatus,
     AttendanceRecordBase,
@@ -56,6 +62,10 @@ __all__ = [
     "SessionFinancialStatsResponse",
     "CancelThresholdRequest",
     "CancelThresholdResponse",
+    "CourseBase",
+    "CourseCreate",
+    "CourseUpdate",
+    "CourseResponse",
     "AttendanceStatus",
     "AttendanceRecordBase",
     "AttendanceRecordResponse",

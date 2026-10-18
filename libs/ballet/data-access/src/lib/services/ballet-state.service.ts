@@ -392,8 +392,12 @@ export class BalletStateService {
 
     let syncError: string | null = null;
     forkJoin({
-      students: this.api.getStudents().pipe(catchError(err => {
+      courses: this.api.getCourses().pipe(catchError(err => {
         syncError = err?.message || 'API sync failed';
+        return of(null);
+      })),
+      students: this.api.getStudents().pipe(catchError(err => {
+        if (!syncError) syncError = err?.message || 'API sync failed';
         return of(null);
       })),
       sessions: this.api.getSessions().pipe(catchError(err => {
@@ -401,12 +405,27 @@ export class BalletStateService {
         return of(null);
       }))
     }).subscribe({
-      next: ({ students, sessions }) => {
+      next: ({ courses, students, sessions }) => {
         if (students && sessions) {
           this.isOnline.set(true);
           this.lastSyncError.set(null);
           this.students.set(students);
           this.sessions.set(sessions);
+
+          if (Array.isArray(courses) && courses.length > 0) {
+            this.courses.set(courses);
+            if (!courses.find(c => c.id === this.selectedCourseId())) {
+              this.selectedCourseId.set(courses[0].id);
+            }
+          }
+
+          if (sessions.length > 0) {
+            if (!sessions.find(s => s.id === this.selectedSessionId())) {
+              this.selectedSessionId.set(sessions[0].id);
+            }
+          } else {
+            this.selectedSessionId.set('');
+          }
 
           // 從學員中提取 active 票卡
           const packs: TicketPack[] = [];
@@ -1070,6 +1089,17 @@ export class BalletStateService {
 
     this.courses.set([...this.courses(), newCourse]);
     this.selectedCourseId.set(newCourse.id);
+
+    // 背景非同步同步至後端 API
+    if (this.api?.isAvailable) {
+      this.api.createCourse(newCourse).subscribe({
+        error: (err) => {
+          console.warn('Background create course sync failed', err);
+          this.lastSyncError.set(err.message || '建立期班同步失敗');
+        }
+      });
+    }
+
     return newCourse;
   }
 

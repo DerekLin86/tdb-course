@@ -5,7 +5,11 @@
       <span class="brand-prefix">TRIPLE DREAM BALLET · MANAGEMENT</span>
       <h1 class="page-title">課堂管理與財務防護</h1>
       <p class="page-subtitle">
-        當前管理課堂：<strong>{{ session().title }}</strong> · {{ session().date }} ({{ session().dayOfWeek }})
+        @if (session(); as curr) {
+          當前管理課堂：<strong>{{ curr.title }}</strong> · {{ curr.date }} ({{ curr.dayOfWeek }})
+        } @else {
+          當前管理課堂：<strong>尚未排定課堂</strong>（請點擊「排定新課堂」開始）
+        }
       </p>
     </div>
 
@@ -64,10 +68,14 @@
       </button>
 
       <div class="session-status-tag">
-        @if (session().status === 'cancelled') {
-          <span class="tag-cancelled">本週已順延取消</span>
+        @if (session(); as curr) {
+          @if (curr.status === 'cancelled') {
+            <span class="tag-cancelled">本週已順延取消</span>
+          } @else {
+            <span class="tag-active">課堂進行中</span>
+          }
         } @else {
-          <span class="tag-active">課堂進行中</span>
+          <span class="tag-inactive">尚無課堂</span>
         }
       </div>
     </div>
@@ -130,15 +138,16 @@
     </div>
   </section>
 
-  <!-- 核心區一：開班門檻與單堂成本損益防護監控看板 -->
-  <section class="financial-guard-card">
-    <div class="guard-header">
-      <div class="guard-title-group">
-        <div>
-          <h2 class="guard-title">場租防虧損與開班門檻監控（當前課堂）</h2>
-          <p class="guard-sub">場租 ${{ financials().venueCost }} ＋ 師資 ${{ financials().teacherFee }} ＝ 總成本 ${{ financials().totalCost }} / 場 ｜ 每堂學費折合 ${{ session().feePerStudent }}</p>
+  @if (session(); as curr) {
+    <!-- 核心區一：開班門檻與單堂成本損益防護監控看板 -->
+    <section class="financial-guard-card">
+      <div class="guard-header">
+        <div class="guard-title-group">
+          <div>
+            <h2 class="guard-title">場租防虧損與開班門檻監控（當前課堂）</h2>
+            <p class="guard-sub">場租 ${{ financials().venueCost }} ＋ 師資 ${{ financials().teacherFee }} ＝ 總成本 ${{ financials().totalCost }} / 場 ｜ 每堂學費折合 ${{ curr.feePerStudent }}</p>
+          </div>
         </div>
-      </div>
 
       <!-- 損益警報燈 -->
       <div
@@ -202,7 +211,7 @@
     </div>
 
     <!-- 虧損風險警示處置條 -->
-    @if (financials().isAtRisk && session().status !== 'cancelled') {
+    @if (financials().isAtRisk && curr.status !== 'cancelled') {
       <div class="risk-action-bar">
         <div class="risk-info">
           <div>
@@ -340,6 +349,21 @@
       </table>
     </div>
   </section>
+} @else {
+    <div class="empty-sessions-card">
+      <div class="empty-sessions-content">
+        <h3 class="empty-sessions-title">本期班尚未排定任何課堂</h3>
+        <p class="empty-sessions-desc">目前此期班尚無已排程或進行中之課堂，請點擊上方「排定新課堂」開始安排。</p>
+        <button
+          type="button"
+          class="btn-create-session"
+          (click)="openCreateSessionModal()"
+        >
+          <span class="btn-icon">＋</span> 立即排定新課堂
+        </button>
+      </div>
+    </div>
+  }
 
   <!-- 手寫簽名存根放大彈窗 -->
   @if (viewingSignature(); as sig) {
@@ -729,7 +753,7 @@
           }
 
           <p class="modal-desc">
-            當前課堂：<strong>{{ session().title }}</strong>（{{ session().date }} {{ session().dayOfWeek }}）
+            當前課堂：<strong>{{ session()?.title || '當前課堂' }}</strong>@if (session(); as curr) {（{{ curr.date }} {{ curr.dayOfWeek }}）}
           </p>
 
           @if (enrollMode() === 'existing') {

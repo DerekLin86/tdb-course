@@ -17,6 +17,7 @@ from main import app
 from models.student import Student, TicketPack
 from models.session import ClassSession
 from models.attendance import AttendanceRecord
+from models.course import Course
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
 

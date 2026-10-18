@@ -12,6 +12,7 @@ from routers.students import router as students_router
 from routers.sessions import router as sessions_router
 from routers.attendance import router as attendance_router
 from routers.system import router as system_router
+from routers.courses import router as courses_router
 
 
 @asynccontextmanager
@@ -53,12 +54,14 @@ app.include_router(students_router, prefix="/api/v1")
 app.include_router(sessions_router, prefix="/api/v1")
 app.include_router(attendance_router, prefix="/api/v1")
 app.include_router(system_router, prefix="/api/v1")
+app.include_router(courses_router, prefix="/api/v1")
 
 # Also mount under /api for client convenience
 app.include_router(students_router, prefix="/api")
 app.include_router(sessions_router, prefix="/api")
 app.include_router(attendance_router, prefix="/api")
 app.include_router(system_router, prefix="/api")
+app.include_router(courses_router, prefix="/api")
 
 
 @app.get("/", tags=["Health"])

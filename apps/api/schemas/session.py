@@ -20,6 +20,10 @@ class ClassSessionBase(CamelModel):
     min_threshold: int = 4
     status: SessionStatus = 'scheduled'
     cancellation_reason: Optional[str] = None
+    course_id: Optional[str] = None
+    session_index: Optional[int] = None
+    teacher_fee: int = 1200
+    other_cost: int = 0
 
 
 class ClassSessionCreate(ClassSessionBase):
@@ -30,6 +34,10 @@ class ClassSessionUpdate(CamelModel):
     title: Optional[str] = None
     status: Optional[SessionStatus] = None
     cancellation_reason: Optional[str] = None
+    course_id: Optional[str] = None
+    session_index: Optional[int] = None
+    teacher_fee: Optional[int] = None
+    other_cost: Optional[int] = None
 
 
 class ClassSessionResponse(ClassSessionBase):

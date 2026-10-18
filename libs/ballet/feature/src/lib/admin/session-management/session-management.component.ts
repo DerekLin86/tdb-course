@@ -276,6 +276,7 @@ export class SessionManagementComponent {
 
   // 手動變更出勤狀態
   changeAttendance(studentId: string, status: AttendanceStatus): void {
+    if (!this.session()) return;
     this.state.setStudentAttendanceStatus(studentId, status);
   }
 
@@ -290,6 +291,10 @@ export class SessionManagementComponent {
   }
 
   openEnrollModal(): void {
+    if (!this.session()) {
+      alert('請先排定課堂，再為課堂加入學員。');
+      return;
+    }
     this.enrollError.set(null);
     const available = this.availableStudentsToEnroll();
     this.selectedStudentToEnroll.set(available.length > 0 ? available[0].id : '');

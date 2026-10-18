@@ -3,5 +3,6 @@ from database import Base
 from models.student import Student, TicketPack
 from models.session import ClassSession
 from models.attendance import AttendanceRecord
+from models.course import Course
 
-__all__ = ["Base", "Student", "TicketPack", "ClassSession", "AttendanceRecord"]
+__all__ = ["Base", "Student", "TicketPack", "ClassSession", "AttendanceRecord", "Course"]

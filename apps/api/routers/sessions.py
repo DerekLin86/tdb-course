@@ -43,6 +43,10 @@ def create_session(payload: ClassSessionCreate, db: Session = Depends(get_db)):
         min_threshold=payload.min_threshold,
         status=payload.status,
         cancellation_reason=payload.cancellation_reason,
+        course_id=payload.course_id,
+        session_index=payload.session_index,
+        teacher_fee=payload.teacher_fee,
+        other_cost=payload.other_cost,
     )
     db.add(session)
     db.commit()

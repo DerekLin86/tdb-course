@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { BalletApiService, BALLET_API_BASE_URL } from './ballet-api.service';
 import { StudentWithActivePack, TicketPack } from '../types/student.type';
-import { ClassSession, AttendanceRecord, SessionFinancialStats } from '../types/attendance.type';
+import { ClassSession, AttendanceRecord, SessionFinancialStats, Course } from '../types/attendance.type';
 import {
   CheckInResponse,
   LeaveResponse,
@@ -140,6 +140,64 @@ describe('BalletApiService', () => {
       expect(req.request.method).toBe('PATCH');
       expect(req.request.body).toEqual({ extraDays: 30 });
       req.flush(mockPack);
+    });
+  });
+
+  describe('Courses Endpoints', () => {
+    it('getCourses() 應發送 GET 請求至 /courses', () => {
+      const mockCourses: Course[] = [
+        {
+          id: 'course-1',
+          title: '成人優雅芭蕾美姿體雕班 (秋季初階期班)',
+          description: '專為成人初學者設計',
+          totalSessions: 8,
+          defaultVenueCost: 2000,
+          defaultTeacherFee: 1200,
+          defaultFeePerStudent: 500,
+          minThreshold: 4,
+          status: 'active'
+        }
+      ];
+
+      service.getCourses().subscribe(courses => {
+        expect(courses).toEqual(mockCourses);
+      });
+
+      const req = httpMock.expectOne(`${baseUrl}/courses`);
+      expect(req.request.method).toBe('GET');
+      req.flush(mockCourses);
+    });
+
+    it('createCourse() 應發送 POST 請求至 /courses', () => {
+      const payload: Partial<Course> = {
+        title: '成人芭蕾進階硬鞋班',
+        totalSessions: 10,
+        defaultVenueCost: 2500,
+        defaultTeacherFee: 1500,
+        defaultFeePerStudent: 600,
+        minThreshold: 4,
+        status: 'active'
+      };
+      const mockCourse: Course = {
+        id: 'course-new',
+        title: '成人芭蕾進階硬鞋班',
+        description: '',
+        totalSessions: 10,
+        defaultVenueCost: 2500,
+        defaultTeacherFee: 1500,
+        defaultFeePerStudent: 600,
+        minThreshold: 4,
+        status: 'active'
+      };
+
+      service.createCourse(payload).subscribe(res => {
+        expect(res).toEqual(mockCourse);
+      });
+
+      const req = httpMock.expectOne(`${baseUrl}/courses`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual(payload);
+      req.flush(mockCourse);
     });
   });
 
@@ -405,7 +463,10 @@ describe('BalletApiService (HttpClient 未注入時)', () => {
   it('當 HttpClient 未提供時，唯讀查詢回傳空陣列 Observable', (done) => {
     service.getStudents().subscribe(students => {
       expect(students).toEqual([]);
-      done();
+      service.getCourses().subscribe(courses => {
+        expect(courses).toEqual([]);
+        done();
+      });
     });
   });
 });

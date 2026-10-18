@@ -664,6 +664,7 @@ def init_db(seed: bool = True, force_seed: bool = False) -> None:
     from models.student import Student, TicketPack
     from models.session import ClassSession
     from models.attendance import AttendanceRecord
+    from models.course import Course
     from seed import seed_mock_data
 
     Base.metadata.create_all(bind=engine)
@@ -684,6 +685,7 @@ def reset_db() -> None:
     from models.student import Student, TicketPack
     from models.session import ClassSession
     from models.attendance import AttendanceRecord
+    from models.course import Course
 
     Base.metadata.drop_all(bind=engine)
     engine.close_all()

@@ -501,6 +501,8 @@ describe('BalletStateService (後端 API 整合與非同步同步機制)', () =>
     localStorage.clear();
 
     mockApi = jasmine.createSpyObj<BalletApiService>('BalletApiService', [
+      'getCourses',
+      'createCourse',
       'getStudents',
       'getSessions',
       'getSessionAttendance',
@@ -521,6 +523,30 @@ describe('BalletStateService (後端 API 整合與非同步同步機制)', () =>
       baseUrl: 'http://localhost:8000/api/v1'
     });
 
+    mockApi.getCourses.and.returnValue(of([
+      {
+        id: 'course-1',
+        title: '成人優雅芭蕾美姿體雕班 (秋季初階期班)',
+        description: '專為成人初學者設計',
+        totalSessions: 8,
+        defaultVenueCost: 2000,
+        defaultTeacherFee: 1200,
+        defaultFeePerStudent: 500,
+        minThreshold: 4,
+        status: 'active'
+      }
+    ]));
+    mockApi.createCourse.and.returnValue(of({
+      id: 'course-new',
+      title: '成人芭蕾進階班',
+      description: '',
+      totalSessions: 8,
+      defaultVenueCost: 2000,
+      defaultTeacherFee: 1200,
+      defaultFeePerStudent: 500,
+      minThreshold: 4,
+      status: 'active'
+    }));
     mockApi.getStudents.and.returnValue(of(mockStudents));
     mockApi.getSessions.and.returnValue(of(mockSessions));
     mockApi.getSessionAttendance.and.returnValue(of(mockAttendance));

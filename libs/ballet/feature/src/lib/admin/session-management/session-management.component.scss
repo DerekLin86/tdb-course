@@ -281,7 +281,8 @@
   }
 
   .tag-active,
-  .tag-cancelled {
+  .tag-cancelled,
+  .tag-inactive {
     padding: 0.4rem 0.9rem;
     border-radius: 20px;
     font-size: 0.85rem;
@@ -296,6 +297,11 @@
   .tag-cancelled {
     background: #fdf2f2;
     color: #dc2626;
+  }
+
+  .tag-inactive {
+    background: #f1f5f9;
+    color: #64748b;
   }
 
   @include iphone {
@@ -946,6 +952,53 @@
       padding: 0.55rem 1.25rem;
       border-radius: 10px;
       font-size: 0.9rem;
+    }
+  }
+}
+
+// --- 尚無課堂之空狀態卡片 ---
+.empty-sessions-card {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #e7edf3;
+  padding: 4rem 2rem;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  margin-bottom: 2rem;
+
+  .empty-sessions-content {
+    max-width: 480px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .empty-sessions-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+  }
+
+  .empty-sessions-desc {
+    font-size: 0.92rem;
+    color: #64748b;
+    line-height: 1.6;
+    margin: 0 0 0.75rem;
+  }
+
+  .btn-create-session {
+    @extend %btn-berry-base;
+    gap: 0.4rem;
+    padding: 0.6rem 1.4rem;
+    border-radius: 14px;
+    font-size: 0.92rem;
+
+    .btn-icon {
+      font-size: 1.1rem;
+      line-height: 1;
     }
   }
 }

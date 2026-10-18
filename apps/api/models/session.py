@@ -21,6 +21,13 @@ class ClassSession(Base):
     min_threshold = Column(Integer(), nullable=False, default=4)
     status = Column(String(), nullable=False, default="scheduled")  # 'scheduled', 'completed', 'cancelled'
     cancellation_reason = Column(Text(), nullable=True)
+
+    # Course alignment & financial fields with safe SQLite defaults for auto-migration
+    course_id = Column(String(), nullable=True, index=True)
+    session_index = Column(Integer(), nullable=True)
+    teacher_fee = Column(Integer(), nullable=False, default=1200)
+    other_cost = Column(Integer(), nullable=False, default=0)
+
     created_at = Column(DateTime(), default=lambda: datetime.now().isoformat(), nullable=False)
     updated_at = Column(DateTime(), default=lambda: datetime.now().isoformat(), nullable=False)
 
@@ -28,4 +35,8 @@ class ClassSession(Base):
         "AttendanceRecord",
         back_populates="session",
         cascade="all, delete-orphan"
+    )
+    course = relationship(
+        "Course",
+        back_populates="sessions"
     )
