@@ -1120,6 +1120,49 @@ export class BalletStateService {
     }
   }
 
+  // 刪除指定期班課程
+  deleteCourse(courseId: string): void {
+    const courseToDelete = this.courses().find(c => c.id === courseId);
+    if (!courseToDelete) return;
+
+    // 找出隸屬該期班的所有課堂 ID
+    const relatedSessionIds = new Set(
+      this.sessions().filter(s => s.courseId === courseId).map(s => s.id)
+    );
+
+    // 1. 自 courses 移除
+    const remainingCourses = this.courses().filter(c => c.id !== courseId);
+    this.courses.set(remainingCourses);
+
+    // 2. 級聯清理所屬課堂與出勤
+    this.sessions.set(this.sessions().filter(s => s.courseId !== courseId));
+    this.attendance.set(this.attendance().filter(a => !relatedSessionIds.has(a.sessionId)));
+
+    // 3. 處理選取狀態回退
+    if (this.selectedCourseId() === courseId) {
+      if (remainingCourses.length > 0) {
+        const nextCourse = remainingCourses[0];
+        this.setSelectedCourse(nextCourse.id);
+      } else {
+        this.selectedCourseId.set('');
+        this.selectedSessionId.set('');
+      }
+    } else if (relatedSessionIds.has(this.selectedSessionId())) {
+      const currentCourseSessions = this.sessions().filter(s => s.courseId === this.selectedCourseId());
+      this.selectedSessionId.set(currentCourseSessions[0]?.id || '');
+    }
+
+    // 4. 背景非同步同步至後端 API
+    if (this.api?.isAvailable) {
+      this.api.deleteCourse(courseId).subscribe({
+        error: (err) => {
+          console.warn('Background delete course sync failed', err);
+          this.lastSyncError.set(err.message || '刪除期班同步失敗');
+        }
+      });
+    }
+  }
+
   // 為指定期班新增課堂
   addSessionToCourse(
     courseId: string,

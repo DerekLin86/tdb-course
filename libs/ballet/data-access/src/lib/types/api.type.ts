@@ -75,3 +75,8 @@ export interface SystemResetResponse {
   sessionsCount: number;
   attendanceCount: number;
 }
+
+export interface DeleteCourseResponse {
+  success: boolean;
+  message?: string;
+}

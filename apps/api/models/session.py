@@ -2,7 +2,7 @@
 ClassSession ORM model.
 """
 from datetime import datetime
-from database import Base, Column, String, Integer, Text, DateTime, relationship
+from database import Base, Column, ForeignKey, String, Integer, Text, DateTime, relationship
 
 
 class ClassSession(Base):
@@ -23,7 +23,12 @@ class ClassSession(Base):
     cancellation_reason = Column(Text(), nullable=True)
 
     # Course alignment & financial fields with safe SQLite defaults for auto-migration
-    course_id = Column(String(), nullable=True, index=True)
+    course_id = Column(
+        String(),
+        foreign_key=ForeignKey("courses.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     session_index = Column(Integer(), nullable=True)
     teacher_fee = Column(Integer(), nullable=False, default=1200)
     other_cost = Column(Integer(), nullable=False, default=0)

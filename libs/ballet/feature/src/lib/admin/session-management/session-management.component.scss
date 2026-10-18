@@ -280,6 +280,49 @@
     }
   }
 
+  .btn-delete-course {
+    display: inline-flex;
+    align-items: center;
+    background: #ffffff;
+    color: #9f6b78;
+    border: 1.5px solid #e5d3d8;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(142, 91, 105, 0.05);
+    transition: all 0.2s ease;
+    gap: 0.4rem;
+    padding: 0.55rem 1.15rem;
+    border-radius: 14px;
+    font-size: 0.9rem;
+
+    .btn-icon {
+      font-size: 0.95rem;
+      line-height: 1;
+    }
+
+    &:hover:not(:disabled) {
+      background: #fbf5f6;
+      border-color: #8e5b69;
+      color: #784855;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(142, 91, 105, 0.12);
+    }
+
+    &:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      border-color: #e2e8f0;
+      color: #94a3b8;
+      background: #f8fafc;
+      box-shadow: none;
+      transform: none;
+    }
+  }
+
   .tag-active,
   .tag-cancelled,
   .tag-inactive {
@@ -342,7 +385,8 @@
     }
 
     .btn-create-course,
-    .btn-create-session {
+    .btn-create-session,
+    .btn-delete-course {
       justify-content: center;
       min-height: 44px;
     }
@@ -1364,5 +1408,131 @@
   .modal-footer {
     @extend %modal-footer-base;
     padding: 1.25rem 1.75rem;
+  }
+}
+
+// --- 刪除期班確認彈窗 ---
+.modal-card.modal-delete-course {
+  @extend %modal-card-base;
+  max-width: 520px;
+  border-radius: 24px;
+  max-height: 90vh;
+
+  .modal-header {
+    padding: 1.5rem 1.75rem 1.25rem;
+    background: #ffffff;
+    border-bottom: 1px solid #edf2f7;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+
+    .modal-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #8e5b69;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 0.25rem;
+    }
+
+    .modal-title {
+      margin: 0.2rem 0 0.15rem;
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #1e293b;
+    }
+
+    .modal-subtitle {
+      margin: 0;
+      font-size: 0.88rem;
+      color: #64748b;
+    }
+
+    .btn-close {
+      @extend %modal-close-btn;
+    }
+  }
+
+  .modal-body {
+    padding: 1.5rem 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+
+    .delete-warning-card {
+      background: #faf6f7;
+      border: 1px solid #f2e1e5;
+      border-radius: 16px;
+      padding: 1.25rem 1.4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+
+      .warning-title {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #784855;
+
+        strong {
+          color: #431b26;
+        }
+      }
+
+      .warning-desc {
+        margin: 0;
+        font-size: 0.9rem;
+        color: #664c54;
+        line-height: 1.55;
+
+        strong {
+          color: #784855;
+          font-weight: 700;
+        }
+      }
+
+      .warning-callout {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #8e5b69;
+        background: #ffffff;
+        border: 1px solid #edd5dc;
+        border-radius: 10px;
+        padding: 0.65rem 0.9rem;
+      }
+    }
+  }
+
+  .modal-footer {
+    @extend %modal-footer-base;
+    padding: 1.25rem 1.75rem;
+
+    .btn-danger-confirm {
+      display: inline-flex;
+      align-items: center;
+      background: #8e5b69;
+      color: #ffffff;
+      border: none;
+      padding: 0.6rem 1.5rem;
+      border-radius: 10px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(142, 91, 105, 0.25);
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: #784855;
+        box-shadow: 0 6px 16px rgba(120, 72, 85, 0.35);
+        transform: translateY(-1px);
+      }
+
+      &:active {
+        transform: translateY(0);
+      }
+    }
   }
 }

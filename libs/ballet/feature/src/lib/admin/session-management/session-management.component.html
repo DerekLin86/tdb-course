@@ -67,6 +67,16 @@
         <span class="btn-icon">＋</span> 排定新課堂
       </button>
 
+      <button
+        type="button"
+        class="btn-delete-course"
+        [disabled]="!currentCourse() || courses().length === 0"
+        (click)="openDeleteCourseModal()"
+        title="刪除當前期班課程"
+      >
+        <span class="btn-icon">✕</span> 刪除期班
+      </button>
+
       <div class="session-status-tag">
         @if (session(); as curr) {
           @if (curr.status === 'cancelled') {
@@ -837,6 +847,43 @@
           } @else {
             <button type="button" class="btn-primary" (click)="submitQuickCreateAndEnroll()">建立並加入本課</button>
           }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- 刪除期班確認彈窗 -->
+  @if (showDeleteCourseModal()) {
+    <div class="modal-backdrop" (click)="closeDeleteCourseModal()">
+      <div class="modal-card modal-delete-course" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div>
+            <span class="modal-badge">COURSE DELETION · 刪除確認</span>
+            <h3 class="modal-title">確認刪除期班</h3>
+            <p class="modal-subtitle">請確認是否要刪除以下期班課程與所有關聯排程</p>
+          </div>
+          <button type="button" class="btn-close" (click)="closeDeleteCourseModal()">✕</button>
+        </div>
+
+        <div class="modal-body">
+          @if (currentCourse(); as course) {
+            <div class="delete-warning-card">
+              <div class="warning-title">即將移除期班：<strong>{{ course.title }}</strong></div>
+              <p class="warning-desc">
+                此操作將一併移除該期班底下的所有排定堂數（共 <strong>{{ courseSessions().length }}</strong> 堂）與簽到出勤存根。
+              </p>
+              <div class="warning-callout">
+                注意：此操作無法復原，請再次核對是否確認刪除。
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-cancel" (click)="closeDeleteCourseModal()">取消</button>
+          <button type="button" class="btn-danger-confirm" (click)="confirmDeleteCourse()">
+            確認刪除期班
+          </button>
         </div>
       </div>
     </div>

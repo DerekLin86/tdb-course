@@ -126,3 +126,39 @@ def test_create_session_with_course_linkage(client: TestClient):
     assert detail["sessionIndex"] == 1
     assert detail["teacherFee"] == 1500
     assert detail["otherCost"] == 200
+
+
+def test_delete_course_success(client: TestClient):
+    # 1. Create course
+    c_resp = client.post("/api/v1/courses", json={"id": "course-del-1", "title": "待刪除期班"})
+    assert c_resp.status_code == 201
+
+    # 2. Create session linked to course
+    s_resp = client.post("/api/v1/sessions", json={
+        "id": "session-del-1",
+        "courseId": "course-del-1",
+        "date": "2026-06-01",
+        "dayOfWeek": "週一",
+        "startTime": "14:00",
+        "endTime": "15:30",
+        "title": "待刪除期班 - 第 1 堂",
+        "venueName": "敦南排練室",
+    })
+    assert s_resp.status_code == 201
+
+    # 3. Delete course
+    del_resp = client.delete("/api/v1/courses/course-del-1")
+    assert del_resp.status_code == 200
+    data = del_resp.json()
+    assert data["success"] is True
+    assert "待刪除期班" in data["message"]
+
+    # 4. Verify course and session are deleted
+    assert client.get("/api/v1/courses/course-del-1").status_code == 404
+    assert client.get("/api/v1/sessions/session-del-1").status_code == 404
+
+
+def test_delete_course_not_found(client: TestClient):
+    resp = client.delete("/api/v1/courses/non-existent-course-id")
+    assert resp.status_code == 404
+    assert "查無此課程" in resp.json()["detail"]

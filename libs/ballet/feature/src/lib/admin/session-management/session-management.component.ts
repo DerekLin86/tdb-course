@@ -41,6 +41,9 @@ export class SessionManagementComponent {
   readonly newCourseMinThreshold = signal<number>(4);
   readonly createCourseError = signal<string | null>(null);
 
+  // 刪除期班確認彈窗 Signals
+  readonly showDeleteCourseModal = signal<boolean>(false);
+
   // 排定新課堂彈窗與表單 Signals
   readonly showCreateSessionModal = signal<boolean>(false);
   readonly newSessionCourseId = signal<string>('course-1');
@@ -152,6 +155,23 @@ export class SessionManagementComponent {
 
     this.closeCreateCourseModal();
     alert(`✅ 已成功建立期班課程【${createdCourse.title}】！`);
+  }
+
+  openDeleteCourseModal(): void {
+    if (this.currentCourse()) {
+      this.showDeleteCourseModal.set(true);
+    }
+  }
+
+  closeDeleteCourseModal(): void {
+    this.showDeleteCourseModal.set(false);
+  }
+
+  confirmDeleteCourse(): void {
+    const curr = this.currentCourse();
+    if (!curr) return;
+    this.state.deleteCourse(curr.id);
+    this.closeDeleteCourseModal();
   }
 
   // 開啟排定新課堂彈窗

@@ -517,7 +517,8 @@ describe('BalletStateService (後端 API 整合與非同步同步機制)', () =>
       'createStudent',
       'updateStudent',
       'deleteStudent',
-      'resetSystem'
+      'resetSystem',
+      'deleteCourse'
     ], {
       isAvailable: true,
       baseUrl: 'http://localhost:8000/api/v1'
@@ -547,6 +548,7 @@ describe('BalletStateService (後端 API 整合與非同步同步機制)', () =>
       minThreshold: 4,
       status: 'active'
     }));
+    mockApi.deleteCourse.and.returnValue(of({ success: true, message: '課程已成功刪除' }));
     mockApi.getStudents.and.returnValue(of(mockStudents));
     mockApi.getSessions.and.returnValue(of(mockSessions));
     mockApi.getSessionAttendance.and.returnValue(of(mockAttendance));
@@ -725,6 +727,12 @@ describe('BalletStateService (後端 API 整合與非同步同步機制)', () =>
     service.refreshFromBackend();
     service.deleteStudent('stu-remote-1');
     expect(mockApi.deleteStudent).toHaveBeenCalledWith('stu-remote-1');
+  });
+
+  it('deleteCourse() 應非同步呼叫後端 API deleteCourse', () => {
+    service.refreshFromBackend();
+    service.deleteCourse('course-1');
+    expect(mockApi.deleteCourse).toHaveBeenCalledWith('course-1');
   });
 
   it('【體驗課方案】：儲值體驗課應為 1 堂、效期 14 天、費用 NT$ 400', () => {
@@ -945,6 +953,57 @@ describe('【多堂課課程關聯、全期財務損益與學員出勤進度】'
     expect(afterStats.totalCost).toBe(beforeStats.totalCost - 3200);
     expect(afterStats.totalVenueCost).toBe(beforeStats.totalVenueCost - 2000);
     expect(afterStats.totalTeacherFee).toBe(beforeStats.totalTeacherFee - 1200);
+  });
+
+  it('deleteCourse() 應成功移除指定期班課程並連動級聯清理其所屬課堂與簽到出勤紀錄', () => {
+    const courseToDelete = 'course-1';
+    const targetSessionIds = service.sessions()
+      .filter(s => s.courseId === courseToDelete)
+      .map(s => s.id);
+
+    expect(targetSessionIds.length).toBeGreaterThan(0);
+    const relatedAttendance = service.attendance().filter(a => targetSessionIds.includes(a.sessionId));
+    expect(relatedAttendance.length).toBeGreaterThan(0);
+
+    service.deleteCourse(courseToDelete);
+
+    expect(service.courses().some(c => c.id === courseToDelete)).toBeFalse();
+    expect(service.sessions().some(s => s.courseId === courseToDelete)).toBeFalse();
+    expect(service.attendance().some(a => targetSessionIds.includes(a.sessionId))).toBeFalse();
+  });
+
+  it('deleteCourse() 刪除當前選定之期班時，若仍有其他期班應回退切換選取下一期班', () => {
+    expect(service.selectedCourseId()).toBe('course-1');
+    service.deleteCourse('course-1');
+
+    expect(service.selectedCourseId()).toBe('course-2');
+    expect(service.currentCourse()?.id).toBe('course-2');
+    expect(service.currentSession()?.courseId).toBe('course-2');
+  });
+
+  it('deleteCourse() 當所有期班皆被刪除時，selectedCourseId 與 selectedSessionId 應重置為空字串', () => {
+    service.deleteCourse('course-1');
+    service.deleteCourse('course-2');
+
+    expect(service.courses().length).toBe(0);
+    expect(service.selectedCourseId()).toBe('');
+    expect(service.selectedSessionId()).toBe('');
+    expect(service.currentCourse()).toBeUndefined();
+    expect(service.currentCourseSessions()).toEqual([]);
+  });
+
+  it('deleteCourse() 傳入不存在之 courseId 時應直接 return 不影響現有狀態', () => {
+    const coursesBefore = service.courses();
+    const sessionsBefore = service.sessions();
+    const attendanceBefore = service.attendance();
+    const selectedBefore = service.selectedCourseId();
+
+    service.deleteCourse('non-existent-course-id');
+
+    expect(service.courses()).toEqual(coursesBefore);
+    expect(service.sessions()).toEqual(sessionsBefore);
+    expect(service.attendance()).toEqual(attendanceBefore);
+    expect(service.selectedCourseId()).toBe(selectedBefore);
   });
 });
 

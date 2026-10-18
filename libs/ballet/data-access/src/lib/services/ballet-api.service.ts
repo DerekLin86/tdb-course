@@ -10,6 +10,7 @@ import {
   CancelThresholdResponse,
   TicketPackCreateRequest,
   SystemResetResponse,
+  DeleteCourseResponse,
 } from '../types/api.type';
 
 export const BALLET_API_BASE_URL = new InjectionToken<string>('BALLET_API_BASE_URL', {
@@ -73,6 +74,11 @@ export class BalletApiService {
   createCourse(payload: Partial<Course>): Observable<Course> {
     if (!this.http) return throwError(() => new Error('HttpClient not available'));
     return this.http.post<Course>(`${this.baseUrl}/courses`, payload);
+  }
+
+  deleteCourse(courseId: string): Observable<DeleteCourseResponse> {
+    if (!this.http) return throwError(() => new Error('HttpClient not available'));
+    return this.http.delete<DeleteCourseResponse>(`${this.baseUrl}/courses/${courseId}`);
   }
 
   // 2. Class Sessions & Financials

@@ -10,6 +10,7 @@ import {
   CancelLeaveResponse,
   CancelThresholdResponse,
   SystemResetResponse,
+  DeleteCourseResponse,
 } from '../types/api.type';
 
 describe('BalletApiService', () => {
@@ -198,6 +199,21 @@ describe('BalletApiService', () => {
       expect(req.request.method).toBe('POST');
       expect(req.request.body).toEqual(payload);
       req.flush(mockCourse);
+    });
+
+    it('deleteCourse() 應發送 DELETE 請求至 /courses/{id}', () => {
+      const mockResponse: DeleteCourseResponse = {
+        success: true,
+        message: '課程已成功刪除'
+      };
+
+      service.deleteCourse('course-test-1').subscribe(res => {
+        expect(res).toEqual(mockResponse);
+      });
+
+      const req = httpMock.expectOne(`${baseUrl}/courses/course-test-1`);
+      expect(req.request.method).toBe('DELETE');
+      req.flush(mockResponse);
     });
   });
 
@@ -467,6 +483,16 @@ describe('BalletApiService (HttpClient 未注入時)', () => {
         expect(courses).toEqual([]);
         done();
       });
+    });
+  });
+
+  it('當 HttpClient 未提供時，deleteCourse 應拋出錯誤', (done) => {
+    service.deleteCourse('course-1').subscribe({
+      next: () => fail('應該拋出錯誤'),
+      error: (err) => {
+        expect(err.message).toBe('HttpClient not available');
+        done();
+      }
     });
   });
 });

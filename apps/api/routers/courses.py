@@ -54,3 +54,30 @@ def get_course(course_id: str, db: Session = Depends(get_db)):
             detail=f"查無此課程 (Course ID: {course_id})",
         )
     return CourseResponse.model_validate(course)
+
+
+@router.delete("/{course_id}", status_code=status.HTTP_200_OK)
+def delete_course(course_id: str, db: Session = Depends(get_db)):
+    """Delete a curriculum course and cascade-remove associated sessions and attendance records."""
+    course = db.get(Course, course_id)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"查無此課程 (Course ID: {course_id})",
+        )
+    course_title = course.title
+    # Cascade-delete child sessions and attendance records
+    from models.session import ClassSession
+    from models.attendance import AttendanceRecord
+    sessions = db.query(ClassSession).filter(ClassSession.course_id == course_id).all()
+    for s in sessions:
+        attendance_records = db.query(AttendanceRecord).filter(AttendanceRecord.session_id == s.id).all()
+        for a in attendance_records:
+            db.delete(a)
+        db.delete(s)
+    db.delete(course)
+    db.commit()
+    return {
+        "success": True,
+        "message": f"課程【{course_title}】及所屬課堂與出勤紀錄已安全刪除",
+    }
