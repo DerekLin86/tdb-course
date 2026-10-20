@@ -16,8 +16,6 @@ $tdb-theme: mat.define-theme((
 }
 
 :root {
-  @include mat.all-component-themes($tdb-theme);
-
   --primary: #8e5b69;
   --primary-hover: #784855;
   --primary-light: #f7eef1;
@@ -63,6 +61,8 @@ $tdb-theme: mat.define-theme((
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
   --bottom-tabbar-height: 60px;
+
+  @include mat.all-component-themes($tdb-theme);
 }
 
 html, body {
