@@ -6,6 +6,7 @@ import {
   AttendanceStatus,
   ClassSession,
   CreateClassSessionParams,
+  BatchCreateClassSessionsParams,
   SessionFinancialStats,
   StudentAttendanceHistoryItem,
   Course,
@@ -15,6 +16,11 @@ import {
   StudentCourseSessionDetail,
   CourseEnrollment,
   EnrollStudentInCourseRequest,
+  CourseEnrollmentBatchRequest,
+  CourseEnrollmentBatchResponse,
+  StudentBatchImportItem,
+  CourseEnrollmentBatchImportRequest,
+  CourseEnrollmentBatchImportResponse,
   DeleteCourseEnrollmentResponse
 } from '../types/attendance.type';
 import { BalletApiService } from './ballet-api.service';
@@ -79,7 +85,11 @@ export class BalletStateService {
     if (!course) return [];
     return this.sessions()
       .filter(s => s.courseId === course.id)
-      .sort((a, b) => (a.sessionIndex ?? 0) - (b.sessionIndex ?? 0) || a.date.localeCompare(b.date));
+      .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
+      .map((s, idx) => ({
+        ...s,
+        sessionIndex: idx + 1
+      }));
   });
 
   // 3. 全期課程總體財務與營運統計 Computed
@@ -840,6 +850,141 @@ export class BalletStateService {
     return enrRecord;
   }
 
+  // 將多位現有學員批次加入期班名冊（全期課堂自動同步登錄名冊）
+  enrollStudentsBatchInCourse(courseId: string, studentIds: string[], syncToApi = true): CourseEnrollment[] {
+    const course = this.courses().find(c => c.id === courseId);
+    if (!course || !studentIds || studentIds.length === 0) return [];
+
+    const today = new Date().toISOString().slice(0, 10);
+    const results: CourseEnrollment[] = [];
+    const currentEnrollments = [...this.courseEnrollments()];
+    let enrollmentsUpdated = false;
+
+    const uniqueIds = Array.from(new Set(studentIds));
+
+    for (const studentId of uniqueIds) {
+      const student = this.students().find(s => s.id === studentId);
+      if (!student) continue;
+
+      const existingIndex = currentEnrollments.findIndex(
+        e => e.courseId === courseId && e.studentId === studentId
+      );
+
+      let enrRecord: CourseEnrollment;
+      if (existingIndex >= 0) {
+        const existingEnr = currentEnrollments[existingIndex];
+        if (existingEnr.status !== 'active') {
+          enrRecord = { ...existingEnr, status: 'active', enrolledAt: today };
+          currentEnrollments[existingIndex] = enrRecord;
+          enrollmentsUpdated = true;
+        } else {
+          enrRecord = existingEnr;
+        }
+      } else {
+        enrRecord = {
+          id: `enr-${courseId}-${studentId}`,
+          courseId,
+          studentId,
+          enrolledAt: today,
+          status: 'active'
+        };
+        currentEnrollments.push(enrRecord);
+        enrollmentsUpdated = true;
+      }
+      results.push(enrRecord);
+    }
+
+    if (enrollmentsUpdated) {
+      this.courseEnrollments.set(currentEnrollments);
+    }
+
+    // 同步該期班現存所有課堂名冊
+    const courseSessions = this.sessions().filter(s => s.courseId === courseId);
+    const existingAtts = this.attendance();
+    const newAtts: AttendanceRecord[] = [];
+
+    for (const enr of results) {
+      const student = this.students().find(s => s.id === enr.studentId);
+      if (!student) continue;
+
+      for (const s of courseSessions) {
+        const alreadyExists = existingAtts.some(a => a.sessionId === s.id && a.studentId === student.id)
+          || newAtts.some(a => a.sessionId === s.id && a.studentId === student.id);
+        if (!alreadyExists) {
+          newAtts.push({
+            id: `att-${s.id}-${student.id}`,
+            sessionId: s.id,
+            studentId: student.id,
+            studentName: student.name,
+            status: 'registered',
+            deductedCount: 0,
+            remark: '期班報名自動登錄課堂名冊'
+          });
+        }
+      }
+    }
+
+    if (newAtts.length > 0) {
+      this.attendance.set([...this.attendance(), ...newAtts]);
+    }
+
+    if (this.api?.isAvailable && syncToApi) {
+      this.api.enrollStudentsBatchInCourse(courseId, { studentIds: uniqueIds }).subscribe({
+        error: (err) => console.warn('Background enrollStudentsBatchInCourse failed', err)
+      });
+    }
+
+    return results;
+  }
+
+  // 批次匯入學員並加入期班（解析電話比對既有學員或建立新學員，並同步開通票卡與登錄期班及課堂）
+  batchImportStudentsToCourse(courseId: string, items: StudentBatchImportItem[]): CourseEnrollment[] {
+    const course = this.courses().find(c => c.id === courseId);
+    if (!course || !items || items.length === 0) return [];
+
+    const enrolledStudentIds: string[] = [];
+    const normalizePhone = (phone: string) => phone.replace(/\D/g, '');
+
+    for (const item of items) {
+      if (!item.name?.trim() || !item.phone?.trim()) continue;
+
+      const cleanPhone = item.phone.trim();
+      const normPhone = normalizePhone(cleanPhone);
+
+      // 以電話比對是否為既有學員
+      let student = this.students().find(s => {
+        const sClean = s.phone.trim();
+        return sClean === cleanPhone || (normPhone.length >= 8 && normalizePhone(sClean) === normPhone);
+      });
+
+      if (!student) {
+        student = this.addStudent({
+          name: item.name.trim(),
+          phone: cleanPhone,
+          notes: item.notes?.trim() || undefined,
+          initialPackType: item.initialPackType
+        }, false);
+      }
+
+      if (student && !enrolledStudentIds.includes(student.id)) {
+        enrolledStudentIds.push(student.id);
+      }
+    }
+
+    if (enrolledStudentIds.length === 0) return [];
+
+    // 進行期班名冊登錄與課堂出勤建立（本地同步，skipApi 由本方法統一向 batchImportStudentsToCourse 發送 API 請求）
+    const enrollments = this.enrollStudentsBatchInCourse(courseId, enrolledStudentIds, false);
+
+    if (this.api?.isAvailable) {
+      this.api.batchImportStudentsToCourse(courseId, { students: items }).subscribe({
+        error: (err) => console.warn('Background batchImportStudentsToCourse failed', err)
+      });
+    }
+
+    return enrollments;
+  }
+
   // 自期班名冊移出學員（安全清除未履約之 registered 堂數，完整保留歷史簽到與請假）
   removeStudentFromCourse(courseId: string, studentId: string): void {
     const course = this.courses().find(c => c.id === courseId);
@@ -944,11 +1089,11 @@ export class BalletStateService {
   }
 
   // 新增學員
-  addStudent(params: CreateStudentParams): Student {
+  addStudent(params: CreateStudentParams, syncToApi = true): Student {
     const today = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
     const registeredAt = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-    const newId = `stu-${Date.now()}`;
+    const newId = `stu-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     const newStudent: Student = {
       id: newId,
@@ -963,16 +1108,16 @@ export class BalletStateService {
     // 若有選配初始票卡方案
     if (params.initialPackType && params.initialPackType !== 'none') {
       if (params.initialPackType === 'trial') {
-        this.addTicketPack(newId, 'trial', 1, 14, 400);
+        this.addTicketPack(newId, 'trial', 1, 14, 400, syncToApi);
       } else {
         const count = params.initialPackType === '5_class' ? 5 : 10;
         const validityDays = params.initialPackType === '5_class' ? 60 : 100;
-        this.addTicketPack(newId, params.initialPackType, count, validityDays);
+        this.addTicketPack(newId, params.initialPackType, count, validityDays, undefined, syncToApi);
       }
     }
 
     // 背景非同步同步至後端 API
-    if (this.api?.isAvailable) {
+    if (this.api?.isAvailable && syncToApi) {
       this.api.createStudent(newStudent).subscribe({
         error: (err) => {
           console.warn('Background create student sync failed', err);
@@ -1090,7 +1235,8 @@ export class BalletStateService {
     type: TicketPackType,
     count: number,
     validityDays: number,
-    customPrice?: number
+    customPrice?: number,
+    syncToApi = true
   ): { success: boolean; message: string; pack?: TicketPack } {
     // 終身限購 1 次體驗課防重複校驗
     if (type === 'trial' && this.hasPurchasedTrial(studentId)) {
@@ -1125,7 +1271,7 @@ export class BalletStateService {
     this.ticketPacks.set([...this.ticketPacks(), newPack]);
 
     // 背景非同步同步至後端 API
-    if (this.api?.isAvailable) {
+    if (this.api?.isAvailable && syncToApi) {
       this.api.purchaseTicketPack({
         studentId,
         type,
@@ -1257,7 +1403,7 @@ export class BalletStateService {
     this.selectedCourseId.set(courseId);
     const courseSessions = this.sessions()
       .filter(s => s.courseId === courseId)
-      .sort((a, b) => (a.sessionIndex ?? 0) - (b.sessionIndex ?? 0) || a.date.localeCompare(b.date));
+      .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
 
     if (courseSessions.length > 0) {
       const current = this.currentSession();
@@ -1355,7 +1501,7 @@ export class BalletStateService {
 
     const sessions = this.sessions()
       .filter(s => s.courseId === course.id)
-      .sort((a, b) => (a.sessionIndex ?? 0) - (b.sessionIndex ?? 0) || a.date.localeCompare(b.date));
+      .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
     const allAttendance = this.attendance();
 
     let attendedCount = 0;
@@ -1407,6 +1553,32 @@ export class BalletStateService {
     };
   }
 
+  getStudentCourseStats(studentId: string, courseId?: string): StudentCourseProgress | null {
+    return this.getStudentCourseProgress(studentId, courseId);
+  }
+
+  // 重新計算特定期班內所有課堂之堂數序號 sessionIndex 與標題
+  private reindexCourseSessions(courseId: string, allSessions: ClassSession[]): ClassSession[] {
+    const courseSessions = allSessions.filter(s => s.courseId === courseId);
+    courseSessions.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+
+    const reindexedMap = new Map<string, ClassSession>();
+    courseSessions.forEach((s, idx) => {
+      const newIndex = idx + 1;
+      let newTitle = s.title;
+      if (newTitle && /第\s*\d+\s*堂/.test(newTitle)) {
+        newTitle = newTitle.replace(/第\s*\d+\s*堂/, `第 ${newIndex} 堂`);
+      }
+      reindexedMap.set(s.id, {
+        ...s,
+        sessionIndex: newIndex,
+        title: newTitle
+      });
+    });
+
+    return allSessions.map(s => reindexedMap.get(s.id) || s);
+  }
+
   // 建立新課堂班次
   createSession(sessionData: CreateClassSessionParams): ClassSession {
     const days = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
@@ -1416,9 +1588,10 @@ export class BalletStateService {
     const course = sessionData.courseId ? this.courses().find(c => c.id === sessionData.courseId) : undefined;
     const sessionIndex = sessionData.sessionIndex || (sessionData.courseId ? this.sessions().filter(s => s.courseId === sessionData.courseId).length + 1 : 1);
     const sessionTitle = sessionData.title || (course ? `${course.title} (第 ${sessionIndex} 堂)` : `芭蕾課堂 (第 ${sessionIndex} 堂)`);
+    const sessId = sessionData.id || `session-${sessionData.date}-${(sessionData.startTime || '14:00').replace(':', '')}-${Date.now().toString().slice(-4)}`;
 
     const newSession: ClassSession = {
-      id: `session-${sessionData.date}-${Date.now().toString().slice(-4)}`,
+      id: sessId,
       courseId: sessionData.courseId,
       sessionIndex,
       date: sessionData.date,
@@ -1427,30 +1600,39 @@ export class BalletStateService {
       endTime: sessionData.endTime,
       title: sessionTitle,
       venueName: sessionData.venueName,
-      venueCost: sessionData.venueCost ?? 2000,
-      teacherFee: sessionData.teacherFee ?? 1200,
+      venueCost: sessionData.venueCost ?? course?.defaultVenueCost ?? 2000,
+      teacherFee: sessionData.teacherFee ?? course?.defaultTeacherFee ?? 1200,
       otherCost: sessionData.otherCost ?? 0,
-      feePerStudent: sessionData.feePerStudent ?? 500,
+      feePerStudent: sessionData.feePerStudent ?? course?.defaultFeePerStudent ?? 500,
       maxCapacity: sessionData.maxCapacity ?? 10,
-      minThreshold: sessionData.minThreshold ?? 4,
-      status: 'scheduled'
+      minThreshold: sessionData.minThreshold ?? course?.minThreshold ?? 4,
+      status: sessionData.status || 'scheduled',
+      cancellationReason: sessionData.cancellationReason
     };
 
-    this.sessions.set([newSession, ...this.sessions()]);
-    this.selectedSessionId.set(newSession.id);
-
+    // 1. 合併至 sessions 並針對受影響之期班重新計算 sessionIndex
+    let allSessions = [newSession, ...this.sessions()];
     if (newSession.courseId) {
-      this.selectedCourseId.set(newSession.courseId);
-      // 自動繼承期班名冊已註冊學員
+      allSessions = this.reindexCourseSessions(newSession.courseId, allSessions);
+    }
+    allSessions.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+    this.sessions.set(allSessions);
+
+    const finalSession = allSessions.find(s => s.id === newSession.id) || newSession;
+    this.selectedSessionId.set(finalSession.id);
+
+    // 2. 自動繼承期班名冊已註冊學員出勤記錄
+    if (finalSession.courseId) {
+      this.selectedCourseId.set(finalSession.courseId);
       const enrolled = this.courseEnrollments().filter(
-        e => e.courseId === newSession.courseId && e.status === 'active'
+        e => e.courseId === finalSession.courseId && e.status === 'active'
       );
       const stuList = this.students();
       const newAtts: AttendanceRecord[] = enrolled.map(enr => {
         const stu = stuList.find(s => s.id === enr.studentId);
         return {
-          id: `att-${newSession.id}-${enr.studentId}`,
-          sessionId: newSession.id,
+          id: `att-${finalSession.id}-${enr.studentId}`,
+          sessionId: finalSession.id,
           studentId: enr.studentId,
           studentName: stu?.name || '期班學員',
           status: 'registered',
@@ -1463,9 +1645,9 @@ export class BalletStateService {
       }
     }
 
-    // 背景非同步同步至後端 API
+    // 3. 背景非同步同步至後端 API
     if (this.api?.isAvailable) {
-      this.api.createSession(newSession).subscribe({
+      this.api.createSession(finalSession).subscribe({
         error: (err) => {
           console.warn('Background create session sync failed', err);
           this.lastSyncError.set(err.message || '建立課堂同步失敗');
@@ -1473,7 +1655,108 @@ export class BalletStateService {
       });
     }
 
-    return newSession;
+    return finalSession;
+  }
+
+  // 批次建立課堂班次
+  createSessionsBatch(sessionsData: CreateClassSessionParams[]): ClassSession[] {
+    if (!sessionsData || sessionsData.length === 0) {
+      return [];
+    }
+
+    const days = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+    const createdSessions: ClassSession[] = [];
+    const timestamp = Date.now().toString().slice(-4);
+
+    sessionsData.forEach((item, i) => {
+      const d = new Date(`${item.date}T00:00:00`);
+      const dayOfWeek = item.dayOfWeek || (!isNaN(d.getDay()) ? days[d.getDay()] : '週六');
+      const course = item.courseId ? this.courses().find(c => c.id === item.courseId) : undefined;
+      const sessionIndex = item.sessionIndex || (i + 1);
+      const sessionTitle = item.title || (course ? `${course.title} (第 ${sessionIndex} 堂)` : `芭蕾課堂 (第 ${sessionIndex} 堂)`);
+      const sessId = item.id || `session-${item.date}-${item.startTime.replace(':', '')}-${timestamp}-${i}`;
+
+      const session: ClassSession = {
+        id: sessId,
+        courseId: item.courseId,
+        sessionIndex,
+        date: item.date,
+        dayOfWeek,
+        startTime: item.startTime,
+        endTime: item.endTime,
+        title: sessionTitle,
+        venueName: item.venueName,
+        venueCost: item.venueCost ?? course?.defaultVenueCost ?? 2000,
+        teacherFee: item.teacherFee ?? course?.defaultTeacherFee ?? 1200,
+        otherCost: item.otherCost ?? 0,
+        feePerStudent: item.feePerStudent ?? course?.defaultFeePerStudent ?? 500,
+        maxCapacity: item.maxCapacity ?? 10,
+        minThreshold: item.minThreshold ?? course?.minThreshold ?? 4,
+        status: item.status || 'scheduled',
+        cancellationReason: item.cancellationReason
+      };
+      createdSessions.push(session);
+    });
+
+    // 1. 合併至 sessions 並針對受影響之期班重新計算 sessionIndex
+    let allSessions = [...createdSessions, ...this.sessions()];
+    const affectedCourseIds = new Set(createdSessions.map(s => s.courseId).filter(Boolean) as string[]);
+    for (const courseId of affectedCourseIds) {
+      allSessions = this.reindexCourseSessions(courseId, allSessions);
+    }
+    allSessions.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+    this.sessions.set(allSessions);
+
+    // 取得重新排序與編號後的 createdSessions
+    const finalCreatedSessions = createdSessions.map(
+      s => allSessions.find(curr => curr.id === s.id) || s
+    );
+    finalCreatedSessions.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+
+    // 2. 為每堂課自動匯入該期班的在學學員出勤記錄
+    const newAttendanceRecords: AttendanceRecord[] = [];
+    const stuList = this.students();
+    const allEnrollments = this.courseEnrollments();
+
+    for (const sess of finalCreatedSessions) {
+      if (sess.courseId) {
+        const enrolled = allEnrollments.filter(e => e.courseId === sess.courseId && e.status === 'active');
+        for (const enr of enrolled) {
+          const stu = stuList.find(s => s.id === enr.studentId);
+          newAttendanceRecords.push({
+            id: `att-${sess.id}-${enr.studentId}`,
+            sessionId: sess.id,
+            studentId: enr.studentId,
+            studentName: stu?.name || '期班學員',
+            status: 'registered',
+            deductedCount: 0,
+            remark: '期班建立課堂自動帶入名冊'
+          });
+        }
+      }
+    }
+
+    if (newAttendanceRecords.length > 0) {
+      this.attendance.set([...this.attendance(), ...newAttendanceRecords]);
+    }
+
+    // 3. 設定 selectedSessionId 為最早建立的 scheduled 課堂
+    const earliestScheduled = finalCreatedSessions.find(s => s.status === 'scheduled') || finalCreatedSessions[0];
+    if (earliestScheduled) {
+      this.setSelectedSession(earliestScheduled.id);
+    }
+
+    // 4. 背景非同步呼叫 API 批次建立
+    if (this.api?.isAvailable) {
+      this.api.createSessionsBatch(finalCreatedSessions).subscribe({
+        error: (err) => {
+          console.warn('Background create sessions batch sync failed', err);
+          this.lastSyncError.set(err.message || '批次建立課堂同步失敗');
+        }
+      });
+    }
+
+    return finalCreatedSessions;
   }
 
   // 切換當前選定的課堂

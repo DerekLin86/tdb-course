@@ -1,7 +1,7 @@
 """apps/api/schemas/session.py
 Pydantic schemas for ClassSession and Financials.
 """
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 from .base import CamelModel
 
 SessionStatus = Literal['scheduled', 'completed', 'cancelled']
@@ -28,6 +28,10 @@ class ClassSessionBase(CamelModel):
 
 class ClassSessionCreate(ClassSessionBase):
     id: Optional[str] = None
+
+
+class ClassSessionBatchCreate(CamelModel):
+    sessions: List[ClassSessionCreate]
 
 
 class ClassSessionUpdate(CamelModel):

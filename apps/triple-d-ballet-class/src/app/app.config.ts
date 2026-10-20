@@ -1,6 +1,8 @@
 import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient, withFetch } from '@angular/common/http';
+import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
+import { provideNativeDateAdapter, MAT_DATE_LOCALE } from '@angular/material/core';
 import { BALLET_API_BASE_URL } from '@libs/ballet/data-access';
 
 import { routes } from './app.routes';
@@ -10,6 +12,9 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideHttpClient(withFetch()),
+    provideAnimationsAsync(),
+    provideNativeDateAdapter(),
+    { provide: MAT_DATE_LOCALE, useValue: 'zh-TW' },
     {
       provide: BALLET_API_BASE_URL,
       useFactory: () => {

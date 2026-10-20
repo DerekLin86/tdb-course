@@ -3,7 +3,7 @@ import { of, throwError } from 'rxjs';
 import { BalletStateService } from './ballet-state.service';
 import { BalletApiService } from './ballet-api.service';
 import { StudentWithActivePack, TicketPack } from '../types/student.type';
-import { ClassSession, AttendanceRecord } from '../types/attendance.type';
+import { ClassSession, AttendanceRecord, StudentBatchImportItem } from '../types/attendance.type';
 
 describe('BalletStateService (防虧損與出缺勤業務邏輯測試 - 單機無網路相容性)', () => {
   let service: BalletStateService;
@@ -514,6 +514,7 @@ describe('BalletStateService (後端 API 整合與非同步同步機制)', () =>
       'extendTicketPack',
       'cancelSessionDueToThreshold',
       'createSession',
+      'createSessionsBatch',
       'createStudent',
       'updateStudent',
       'deleteStudent',
@@ -577,6 +578,7 @@ describe('BalletStateService (後端 API 整合與非同步同步機制)', () =>
       refundedCount: 1
     }));
     mockApi.createSession.and.returnValue(of(mockSessions[0]));
+    mockApi.createSessionsBatch.and.returnValue(of(mockSessions));
     mockApi.createStudent.and.returnValue(of(mockStudents[0]));
     mockApi.updateStudent.and.returnValue(of(mockStudents[0]));
     mockApi.deleteStudent.and.returnValue(of({ message: '學員已刪除', success: true }));
@@ -733,6 +735,20 @@ describe('BalletStateService (後端 API 整合與非同步同步機制)', () =>
     service.refreshFromBackend();
     service.deleteCourse('course-1');
     expect(mockApi.deleteCourse).toHaveBeenCalledWith('course-1');
+  });
+
+  it('createSessionsBatch() 應非同步呼叫後端 API createSessionsBatch', () => {
+    service.refreshFromBackend();
+    const batchResult = service.createSessionsBatch([
+      {
+        title: '遠端批次課堂1',
+        date: '2026-10-17',
+        startTime: '10:00',
+        endTime: '11:30',
+        venueName: '敦南日光舞蹈排練室 A 廳'
+      }
+    ]);
+    expect(mockApi.createSessionsBatch).toHaveBeenCalledWith(batchResult);
   });
 
   it('【體驗課方案】：儲值體驗課應為 1 堂、效期 14 天、費用 NT$ 400', () => {
@@ -1005,6 +1021,271 @@ describe('【多堂課課程關聯、全期財務損益與學員出勤進度】'
     expect(service.attendance()).toEqual(attendanceBefore);
     expect(service.selectedCourseId()).toBe(selectedBefore);
   });
+
+  it('currentCourseSessions 與可預約課堂清單應依日期與時間嚴格升冪排序 (Strict date sorting)', () => {
+    service.setSelectedCourse('course-1');
+    const disorderedSessions: ClassSession[] = [
+      {
+        id: 'sess-c',
+        courseId: 'course-1',
+        date: '2026-11-20',
+        dayOfWeek: '週五',
+        startTime: '19:00',
+        endTime: '20:30',
+        title: '課堂 C (最晚)',
+        venueName: '台北敦南教室 A 廳',
+        venueCost: 2000,
+        feePerStudent: 500,
+        maxCapacity: 10,
+        minThreshold: 4,
+        status: 'scheduled'
+      },
+      {
+        id: 'sess-a',
+        courseId: 'course-1',
+        date: '2026-11-01',
+        dayOfWeek: '週日',
+        startTime: '10:00',
+        endTime: '11:30',
+        title: '課堂 A (最早)',
+        venueName: '台北敦南教室 A 廳',
+        venueCost: 2000,
+        feePerStudent: 500,
+        maxCapacity: 10,
+        minThreshold: 4,
+        status: 'scheduled'
+      },
+      {
+        id: 'sess-b',
+        courseId: 'course-1',
+        date: '2026-11-01',
+        dayOfWeek: '週日',
+        startTime: '14:00',
+        endTime: '15:30',
+        title: '課堂 B (同日較晚)',
+        venueName: '台北敦南教室 A 廳',
+        venueCost: 2000,
+        feePerStudent: 500,
+        maxCapacity: 10,
+        minThreshold: 4,
+        status: 'scheduled'
+      },
+      {
+        id: 'sess-cancelled',
+        courseId: 'course-1',
+        date: '2026-11-10',
+        dayOfWeek: '週二',
+        startTime: '14:00',
+        endTime: '15:30',
+        title: '已取消課堂',
+        venueName: '台北敦南教室 A 廳',
+        venueCost: 2000,
+        feePerStudent: 500,
+        maxCapacity: 10,
+        minThreshold: 4,
+        status: 'cancelled'
+      }
+    ];
+
+    service.sessions.set(disorderedSessions);
+
+    // 驗證 currentCourseSessions 嚴格按 date + startTime 升冪排序
+    const sortedCourseSessions = service.currentCourseSessions();
+    expect(sortedCourseSessions.map(s => s.id)).toEqual(['sess-a', 'sess-b', 'sess-cancelled', 'sess-c']);
+
+    // 驗證 availableSessions（排除已取消課堂並按日期時間升冪排序）
+    const availableSessions = service.sessions()
+      .filter(s => s.status !== 'cancelled' && s.courseId === 'course-1')
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+    expect(availableSessions.map(s => s.id)).toEqual(['sess-a', 'sess-b', 'sess-c']);
+  });
+
+  it('createSessionsBatch() 批次建立課堂應自動帶入期班註冊學員出勤名冊，並按時間序編排 sessionIndex', () => {
+    service.setSelectedCourse('course-1');
+    const enrolledStudents = service.courseEnrollments().filter(e => e.courseId === 'course-1' && e.status === 'active');
+    expect(enrolledStudents.length).toBeGreaterThan(0);
+
+    const initialAttendanceCount = service.attendance().length;
+
+    // 批次新增兩堂課堂（故意打亂建立順序，測試時間序編排）
+    const batchResult = service.createSessionsBatch([
+      {
+        courseId: 'course-1',
+        date: '2026-10-17',
+        startTime: '14:00',
+        endTime: '15:30',
+        venueName: '敦南排練室 A 廳'
+      },
+      {
+        courseId: 'course-1',
+        date: '2026-10-10',
+        startTime: '14:00',
+        endTime: '15:30',
+        venueName: '敦南排練室 A 廳'
+      }
+    ]);
+
+    expect(batchResult.length).toBe(2);
+    // 回傳結果應已按日期升冪排序
+    expect(batchResult[0].date).toBe('2026-10-10');
+    expect(batchResult[1].date).toBe('2026-10-17');
+
+    // 原本 course-1 已有 3 堂課 (09-12, 09-19, 09-26)，新建立課堂依序應為第 4 堂與第 5 堂
+    expect(batchResult[0].sessionIndex).toBe(4);
+    expect(batchResult[1].sessionIndex).toBe(5);
+
+    // 驗證為期班註冊學員自動建立的 attendance 記錄
+    const newRecords = service.attendance().slice(initialAttendanceCount);
+    expect(newRecords.length).toBe(enrolledStudents.length * 2);
+    for (const sess of batchResult) {
+      const sessRecords = service.attendance().filter(a => a.sessionId === sess.id);
+      expect(sessRecords.length).toBe(enrolledStudents.length);
+      for (const rec of sessRecords) {
+        expect(rec.status).toBe('registered');
+        expect(rec.deductedCount).toBe(0);
+        expect(rec.remark).toContain('自動帶入名冊');
+      }
+    }
+  });
+
+  it('為期班插入更早日期的課堂時，應重新按時間排序並重新編號 sessionIndex', () => {
+    service.setSelectedCourse('course-1');
+    const sessionsBefore = service.currentCourseSessions();
+    expect(sessionsBefore.length).toBe(3);
+    expect(sessionsBefore[0].date).toBe('2026-09-12');
+    expect(sessionsBefore[0].sessionIndex).toBe(1);
+
+    // 插入一堂更早日期的課堂（2026-09-05）
+    const earlierSession = service.addSessionToCourse('course-1', {
+      date: '2026-09-05',
+      startTime: '14:00',
+      endTime: '15:30'
+    });
+
+    const sessionsAfter = service.currentCourseSessions();
+    expect(sessionsAfter.length).toBe(4);
+
+    // 新插入之更早課堂應排在第一堂，且 sessionIndex 為 1
+    expect(sessionsAfter[0].id).toBe(earlierSession.id);
+    expect(sessionsAfter[0].date).toBe('2026-09-05');
+    expect(sessionsAfter[0].sessionIndex).toBe(1);
+
+    // 原本的課堂應依序後延重新編號
+    expect(sessionsAfter[1].id).toBe(sessionsBefore[0].id);
+    expect(sessionsAfter[1].sessionIndex).toBe(2);
+    expect(sessionsAfter[2].id).toBe(sessionsBefore[1].id);
+    expect(sessionsAfter[2].sessionIndex).toBe(3);
+    expect(sessionsAfter[3].id).toBe(sessionsBefore[2].id);
+    expect(sessionsAfter[3].sessionIndex).toBe(4);
+
+    // 驗證 sessions state 內的物件 sessionIndex 亦被同步重新計算
+    const storedEarlier = service.sessions().find(s => s.id === earlierSession.id);
+    expect(storedEarlier?.sessionIndex).toBe(1);
+    const storedPrev = service.sessions().find(s => s.id === sessionsBefore[0].id);
+    expect(storedPrev?.sessionIndex).toBe(2);
+  });
+
+  describe('期班多選與批次匯入學員 (Batch Enrollment & Batch Import)', () => {
+    it('enrollStudentsBatchInCourse() 應批次更新 courseEnrollments 並為該期班所有課堂自動登錄 attendance (registered)', () => {
+      const initialEnrCount = service.courseEnrollments().length;
+      const initialAttCount = service.attendance().length;
+      const courseSessions = service.sessions().filter(s => s.courseId === 'course-2');
+      expect(courseSessions.length).toBe(2);
+
+      const enrollments = service.enrollStudentsBatchInCourse('course-2', ['stu-1', 'stu-2']);
+      expect(enrollments.length).toBe(2);
+      expect(service.courseEnrollments().length).toBe(initialEnrCount + 2);
+
+      // 驗證名冊狀態為 active
+      for (const enr of enrollments) {
+        expect(enr.courseId).toBe('course-2');
+        expect(enr.status).toBe('active');
+      }
+
+      // 驗證該期班所有課堂均登錄 attendance (registered)
+      expect(service.attendance().length).toBe(initialAttCount + 4);
+      for (const s of courseSessions) {
+        const att1 = service.attendance().find(a => a.sessionId === s.id && a.studentId === 'stu-1');
+        const att2 = service.attendance().find(a => a.sessionId === s.id && a.studentId === 'stu-2');
+        expect(att1).toBeTruthy();
+        expect(att1?.status).toBe('registered');
+        expect(att1?.deductedCount).toBe(0);
+        expect(att2).toBeTruthy();
+        expect(att2?.status).toBe('registered');
+        expect(att2?.deductedCount).toBe(0);
+      }
+    });
+
+    it('enrollStudentsBatchInCourse() 具備冪等性 (Idempotency)，重複加入不應產生重複名冊或出勤紀錄', () => {
+      // 第一次加入
+      service.enrollStudentsBatchInCourse('course-2', ['stu-1', 'stu-2']);
+      const enrCountAfterFirst = service.courseEnrollments().length;
+      const attCountAfterFirst = service.attendance().length;
+
+      // 再次以相同學員及重複 ID 呼叫
+      const secondResult = service.enrollStudentsBatchInCourse('course-2', ['stu-1', 'stu-2', 'stu-1']);
+      expect(secondResult.length).toBe(2);
+
+      // 名冊與出勤紀錄數量不應增加
+      expect(service.courseEnrollments().length).toBe(enrCountAfterFirst);
+      expect(service.attendance().length).toBe(attCountAfterFirst);
+    });
+
+    it('batchImportStudentsToCourse() 應辨識既有電話學員並加入期班，對全新學員自動建立帳號、配置票卡並加入期班', () => {
+      const items: StudentBatchImportItem[] = [
+        {
+          name: '陳秀琴 (別名)',
+          phone: '0912345678', // 既有學員 stu-1 去除符號的電話
+        },
+        {
+          name: '全新學員黃小晶',
+          phone: '0988-777-666',
+          initialPackType: '5_class',
+          notes: '網路預約匯入'
+        }
+      ];
+
+      const initialStudentCount = service.students().length;
+      const initialPacksCount = service.ticketPacks().length;
+
+      const enrollments = service.batchImportStudentsToCourse('course-2', items);
+      expect(enrollments.length).toBe(2);
+
+      // 僅新增 1 位全新學員
+      expect(service.students().length).toBe(initialStudentCount + 1);
+      const newStudent = service.students().find(s => s.phone === '0988-777-666');
+      expect(newStudent).toBeTruthy();
+      expect(newStudent?.name).toBe('全新學員黃小晶');
+      expect(newStudent?.notes).toBe('網路預約匯入');
+
+      // 驗證全新學員獲配 5 堂課票卡
+      expect(service.ticketPacks().length).toBe(initialPacksCount + 1);
+      const newPack = service.ticketPacks().find(p => p.studentId === newStudent?.id);
+      expect(newPack).toBeTruthy();
+      expect(newPack?.type).toBe('5_class');
+      expect(newPack?.totalCount).toBe(5);
+      expect(newPack?.remainingCount).toBe(5);
+      expect(newPack?.status).toBe('active');
+
+      // 驗證既有學員 stu-1 與全新學員均成功登錄 course-2
+      expect(enrollments.some(e => e.studentId === 'stu-1')).toBeTrue();
+      expect(enrollments.some(e => e.studentId === newStudent?.id)).toBeTrue();
+    });
+
+    it('batchImportStudentsToCourse() 若傳入無效課程 ID 或空陣列應安全回傳空陣列', () => {
+      const validItems: StudentBatchImportItem[] = [
+        { name: '測試學員', phone: '0900-111-222' }
+      ];
+
+      const resultInvalidCourse = service.batchImportStudentsToCourse('non-existent-course', validItems);
+      expect(resultInvalidCourse).toEqual([]);
+
+      const resultEmptyItems = service.batchImportStudentsToCourse('course-2', []);
+      expect(resultEmptyItems).toEqual([]);
+    });
+  });
 });
+
 
 

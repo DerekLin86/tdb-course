@@ -1,0 +1,8 @@
+<div class="tdb-calendar-card">
+  <mat-calendar
+    [minDate]="minDate()"
+    [dateClass]="dateClass"
+    [selected]="null"
+    (selectedChange)="onDateSelected($event)"
+  ></mat-calendar>
+</div>

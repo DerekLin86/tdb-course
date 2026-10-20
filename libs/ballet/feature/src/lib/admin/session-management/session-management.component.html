@@ -540,15 +540,15 @@
     </div>
   }
 
-  <!-- 排定新課堂彈窗 Modal -->
+  <!-- 排定新課堂彈窗 Modal (視覺化月曆多日挑選排課) -->
   @if (showCreateSessionModal()) {
     <div class="modal-backdrop" (click)="closeCreateSessionModal()">
-      <div class="session-form-card" (click)="$event.stopPropagation()">
+      <div class="session-form-card modal-create-session" (click)="$event.stopPropagation()">
         <header class="form-card-header">
           <div>
             <span class="modal-prefix">NEW SCHEDULE · 排定班次</span>
-            <h3>排定新課堂班次</h3>
-            <p>排定新的課堂並連動期班損益防護與場租參數</p>
+            <h3>排定課堂班次</h3>
+            <p>點選月曆直接選取或取消開課日期，自動即時推算堂次、損益門檻與期班學員名冊</p>
           </div>
           <button type="button" class="close-btn" (click)="closeCreateSessionModal()">✕</button>
         </header>
@@ -560,8 +560,61 @@
             </div>
           }
 
+          <!-- 視覺化月曆與選定日期雙欄佈局 -->
+          <div class="calendar-selection-layout">
+            <div class="calendar-card-col">
+              <div class="section-badge-header">
+                <span class="badge-tag">STEP 1</span>
+                <h4>點選月曆挑選開課日期</h4>
+              </div>
+              <lib-multi-date-calendar
+                [selectedDates]="selectedDates()"
+                (selectedDatesChange)="onSelectedDatesChange($event)"
+              ></lib-multi-date-calendar>
+            </div>
+
+            <div class="selected-dates-col">
+              <div class="selected-dates-header">
+                <div class="selected-count-badge">
+                  已選取 <strong>{{ selectedDates().length }}</strong> 天開課
+                </div>
+                @if (selectedDates().length > 0) {
+                  <button type="button" class="btn-clear-dates" (click)="clearSelectedDates()">
+                    全部清除
+                  </button>
+                }
+              </div>
+
+              @if (selectedDates().length === 0) {
+                <div class="empty-selection-placeholder">
+                  <p class="placeholder-title">尚未選取任何開課日期</p>
+                  <p class="placeholder-desc">請點擊左側月曆中的日期進行挑選，再次點擊即可取消選取。</p>
+                </div>
+              } @else {
+                <div class="chips-scroll-container">
+                  @for (d of selectedDates(); track d; let idx = $index) {
+                    <div class="selected-date-item">
+                      <span class="item-index">{{ idx + 1 }}</span>
+                      <div class="item-content">
+                        <span class="item-date">{{ d }}</span>
+                        <span class="item-day">{{ getDayOfWeekString(d) }}</span>
+                      </div>
+                      <button
+                        type="button"
+                        class="btn-remove-chip"
+                        (click)="removeSelectedDate(d)"
+                        title="移除此日期"
+                      >✕</button>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- 共同設定一：期班、時段與地點 -->
           <div class="form-section">
-            <h4 class="form-section-title">課堂基本資料</h4>
+            <h4 class="form-section-title">期班課程與上課時段</h4>
 
             <div class="form-group">
               <label for="newSessionCourse" class="form-label">所屬期班課程 <span class="required">*</span></label>
@@ -575,26 +628,6 @@
                   <option [value]="c.id">{{ c.title }}</option>
                 }
               </select>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label for="newSessionDate" class="form-label">開課日期 <span class="required">*</span></label>
-                <input
-                  id="newSessionDate"
-                  type="date"
-                  class="form-input"
-                  [ngModel]="newSessionDate()"
-                  (ngModelChange)="newSessionDate.set($event)"
-                />
-              </div>
-
-              <div class="form-group flex-1">
-                <label class="form-label">星期（自動換算）</label>
-                <div class="form-readonly-badge">
-                  {{ newSessionDayOfWeek() || '請先選擇日期' }}
-                </div>
-              </div>
             </div>
 
             <div class="form-row">
@@ -633,6 +666,7 @@
             </div>
           </div>
 
+          <!-- 共同設定二：成本結構與開班損益門檻 -->
           <div class="form-section">
             <h4 class="form-section-title">成本結構與開班損益門檻</h4>
 
@@ -720,11 +754,64 @@
               防虧損機制：開課前出席人數若少於 {{ newSessionMinThreshold() }} 人，系統將觸發虧損警示，並支援老師一鍵順延停課以保護場租與師資成本不倒貼。
             </p>
           </div>
+
+          <!-- 即時排課預覽清單 -->
+          <div class="form-section preview-section">
+            <div class="preview-header">
+              <h4 class="form-section-title">預定排程預覽清單</h4>
+              <span class="preview-badge">共預定排定 {{ previewSessions().length }} 堂課</span>
+            </div>
+
+            @if (previewSessions().length === 0) {
+              <div class="preview-empty-state">
+                <p>請先設定開課日期以產生預覽清單</p>
+              </div>
+            } @else {
+              <div class="preview-table-wrapper">
+                <table class="preview-table">
+                  <thead>
+                    <tr>
+                      <th>堂次</th>
+                      <th>日期與星期</th>
+                      <th>時段</th>
+                      <th>教室地點</th>
+                      <th>預設登錄學員</th>
+                      <th>門檻 / 滿額</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (p of previewSessions(); track p.date + p.startTime; let idx = $index) {
+                      <tr>
+                        <td class="col-index">第 {{ idx + 1 }} 堂</td>
+                        <td class="col-date">
+                          <strong>{{ p.date }}</strong>
+                          <span class="weekday-pill">{{ p.dayOfWeek }}</span>
+                        </td>
+                        <td class="col-time">{{ p.startTime }} - {{ p.endTime }}</td>
+                        <td class="col-venue">{{ p.venueName }}</td>
+                        <td class="col-enrolled">
+                          <span class="enrolled-badge">{{ p.enrolledCount }} 人登錄</span>
+                        </td>
+                        <td class="col-cap">{{ p.minThreshold }} / {{ p.maxCapacity }} 人</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
         </div>
 
         <footer class="form-card-footer">
           <button type="button" class="btn-cancel" (click)="closeCreateSessionModal()">取消</button>
-          <button type="button" class="btn-submit" (click)="submitCreateSession()">確認排定課堂</button>
+          <button
+            type="button"
+            class="btn-submit"
+            [disabled]="previewSessions().length === 0"
+            (click)="submitCreateSession()"
+          >
+            {{ previewSessions().length <= 1 ? '確認排定課堂' : '確認批次建立 (' + previewSessions().length + ' 堂)' }}
+          </button>
         </footer>
       </div>
     </div>
@@ -746,7 +833,10 @@
             [class.active]="enrollMode() === 'existing'"
             (click)="enrollMode.set('existing')"
           >
-            選擇現有學員
+            選擇現有學員 (批次多選)
+            @if (selectedStudentIdsToEnroll().length > 0) {
+              <span class="seg-badge">{{ selectedStudentIdsToEnroll().length }}</span>
+            }
           </button>
           <button
             type="button"
@@ -754,7 +844,7 @@
             [class.active]="enrollMode() === 'new'"
             (click)="enrollMode.set('new')"
           >
-            + 建立新學員並加入
+            + 建立單筆新學員
           </button>
         </div>
 
@@ -767,29 +857,89 @@
             當前期班：<strong>{{ currentCourse()?.title || '當前期班' }}</strong>（加入後將自動登錄於本期班所有課堂名冊）
           </p>
 
+          <!-- Tab 1: 選擇現有學員 (批次多選) -->
           @if (enrollMode() === 'existing') {
             @if (availableStudentsToEnroll().length === 0) {
               <div class="empty-available-box">
                 <p>所有學員皆已加入此期班名冊！</p>
-                <span class="sub-hint">若需新增未建檔學員，請切換至「+ 建立新學員並加入」標籤。</span>
+                <span class="sub-hint">若需新增未建檔學員，請切換至「+ 建立單筆新學員」。</span>
               </div>
             } @else {
-              <div class="form-group">
-                <label>選擇學員</label>
-                <select
-                  class="form-control"
-                  [ngModel]="selectedStudentToEnroll()"
-                  (ngModelChange)="selectedStudentToEnroll.set($event)"
-                >
-                  @for (s of availableStudentsToEnroll(); track s.id) {
-                    <option [value]="s.id">
-                      {{ s.name }} (剩餘: {{ s.activePack?.remainingCount ?? 0 }} 堂 / {{ s.phone }})
-                    </option>
+              <!-- 搜尋與批次控制列 -->
+              <div class="existing-search-bar">
+                <div class="search-input-wrap">
+                  <input
+                    type="text"
+                    class="form-control search-input"
+                    placeholder="搜尋學員姓名或手機電話..."
+                    [ngModel]="existingSearchQuery()"
+                    (ngModelChange)="existingSearchQuery.set($event)"
+                  />
+                  @if (existingSearchQuery()) {
+                    <button type="button" class="btn-clear-search" (click)="existingSearchQuery.set('')">✕</button>
                   }
-                </select>
+                </div>
+                <div class="batch-select-actions">
+                  <button type="button" class="btn-action-pill" (click)="selectAllAvailableStudents()">
+                    全選 ({{ filteredAvailableStudents().length }})
+                  </button>
+                  @if (selectedStudentIdsToEnroll().length > 0) {
+                    <button type="button" class="btn-action-pill pill-subtle" (click)="clearSelectedStudents()">
+                      全部清除
+                    </button>
+                  }
+                  <span class="selected-count-pill">
+                    已選取 <strong>{{ selectedStudentIdsToEnroll().length }}</strong> 位
+                  </span>
+                </div>
+              </div>
+
+              <!-- 學員勾選卡片清單 (可滾動) -->
+              <div class="student-select-list">
+                @if (filteredAvailableStudents().length === 0) {
+                  <div class="no-filter-match">
+                    <p>查無符合「{{ existingSearchQuery() }}」的學員</p>
+                  </div>
+                }
+                @for (s of filteredAvailableStudents(); track s.id) {
+                  <div
+                    class="student-select-card"
+                    [class.selected]="selectedStudentIdsToEnroll().includes(s.id)"
+                    (click)="toggleStudentSelection(s.id)"
+                  >
+                    <label class="custom-checkbox" (click)="$event.stopPropagation()">
+                      <input
+                        type="checkbox"
+                        [checked]="selectedStudentIdsToEnroll().includes(s.id)"
+                        (change)="toggleStudentSelection(s.id)"
+                      />
+                      <span class="checkbox-indicator"></span>
+                    </label>
+
+                    <div class="student-card-info">
+                      <div class="student-main">
+                        <span class="student-name">{{ s.name }}</span>
+                        <span class="student-phone">{{ s.phone }}</span>
+                      </div>
+                      <div class="student-meta">
+                        <span class="ticket-balance" [class.balance-zero]="(s.activePack?.remainingCount ?? 0) === 0">
+                          剩餘 {{ s.activePack?.remainingCount ?? 0 }} 堂
+                        </span>
+                        @if ((s.activePack?.remainingCount ?? 0) === 0) {
+                          <span class="badge badge-warning-subtle">無剩餘堂數</span>
+                        } @else if (s.isNearExpiry) {
+                          <span class="badge badge-warning-subtle">即將到期</span>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                }
               </div>
             }
-          } @else {
+          }
+
+          <!-- Tab 2: + 建立單筆新學員 -->
+          @if (enrollMode() === 'new') {
             <div class="form-group">
               <label>學員姓名 <span class="required">*</span></label>
               <input
@@ -842,11 +992,18 @@
         <div class="modal-footer">
           <button type="button" class="btn-cancel" (click)="closeEnrollModal()">取消</button>
           @if (enrollMode() === 'existing') {
-            @if (availableStudentsToEnroll().length > 0) {
-              <button type="button" class="btn-primary" (click)="submitEnrollStudent()">確認加入</button>
-            }
+            <button
+              type="button"
+              class="btn-primary"
+              [disabled]="selectedStudentIdsToEnroll().length === 0"
+              (click)="submitBatchEnrollStudents()"
+            >
+              確認加入選取學員 ({{ selectedStudentIdsToEnroll().length }} 位)
+            </button>
           } @else {
-            <button type="button" class="btn-primary" (click)="submitQuickCreateAndEnroll()">建立並加入本課</button>
+            <button type="button" class="btn-primary" (click)="submitQuickCreateAndEnroll()">
+              建立並加入本課
+            </button>
           }
         </div>
       </div>

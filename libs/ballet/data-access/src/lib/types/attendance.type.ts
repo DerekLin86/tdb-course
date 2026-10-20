@@ -52,6 +52,7 @@ export interface ClassSession {
 }
 
 export interface CreateClassSessionParams {
+  id?: string;
   courseId?: string;     // 所屬期班課程 ID
   sessionIndex?: number; // 堂數序號
   title?: string;
@@ -66,6 +67,12 @@ export interface CreateClassSessionParams {
   feePerStudent?: number;// 每堂學費折合，預設 500
   maxCapacity?: number;  // 滿班人數，預設 10
   minThreshold?: number; // 損益防護門檻，預設 4
+  status?: 'scheduled' | 'completed' | 'cancelled';
+  cancellationReason?: string;
+}
+
+export interface BatchCreateClassSessionsParams {
+  sessions: CreateClassSessionParams[];
 }
 
 export interface AttendanceRecord {
@@ -165,3 +172,37 @@ export interface DeleteCourseEnrollmentResponse {
   removedScheduledCount: number;
   preservedAttendedCount: number;
 }
+
+export interface CourseEnrollmentBatchRequest {
+  studentIds: string[];
+  enrolledAt?: string;
+}
+
+export interface CourseEnrollmentBatchResponse {
+  courseId: string;
+  enrolledCount: number;
+  existingCount: number;
+  enrollments: CourseEnrollment[];
+}
+
+export interface StudentBatchImportItem {
+  name: string;
+  phone: string;
+  initialPackType?: 'none' | '5_class' | '10_class' | 'trial';
+  notes?: string;
+}
+
+export interface CourseEnrollmentBatchImportRequest {
+  students: StudentBatchImportItem[];
+  enrolledAt?: string;
+}
+
+export interface CourseEnrollmentBatchImportResponse {
+  courseId: string;
+  totalProcessed: number;
+  createdStudentsCount: number;
+  existingStudentsCount: number;
+  enrolledCount: number;
+  enrollments: CourseEnrollment[];
+}
+

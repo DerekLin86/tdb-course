@@ -5,13 +5,32 @@ import {
   BalletStateService,
   AttendanceStatus,
   ClassSession,
-  TicketPack
+  TicketPack,
+  Course,
+  CreateClassSessionParams
 } from '@libs/ballet/data-access';
+import { MultiDateCalendarComponent } from '@libs/shared/ui';
+
+export interface PreviewSessionItem {
+  sessionIndex: number;
+  date: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  venueName: string;
+  venueCost: number;
+  teacherFee: number;
+  otherCost: number;
+  feePerStudent: number;
+  maxCapacity: number;
+  minThreshold: number;
+  enrolledCount: number;
+}
 
 @Component({
   selector: 'app-session-management',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MultiDateCalendarComponent],
   templateUrl: './session-management.component.html',
   styleUrls: ['./session-management.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -47,7 +66,10 @@ export class SessionManagementComponent {
   // 排定新課堂彈窗與表單 Signals
   readonly showCreateSessionModal = signal<boolean>(false);
   readonly newSessionCourseId = signal<string>('course-1');
-  readonly newSessionDate = signal<string>('');
+
+  // 視覺化月曆選取開課日期 Signals (多日點選)
+  readonly selectedDates = signal<string[]>([]);
+
   readonly newSessionStartTime = signal<string>('14:00');
   readonly newSessionEndTime = signal<string>('15:30');
   readonly newSessionVenue = signal<string>('敦南日光舞蹈排練室 A 廳');
@@ -59,13 +81,41 @@ export class SessionManagementComponent {
   readonly newSessionMinThreshold = signal<number>(4);
   readonly createSessionError = signal<string | null>(null);
 
-  // 根據日期自動推算星期幾
-  readonly newSessionDayOfWeek = computed(() => {
-    const dateStr = this.newSessionDate();
-    if (!dateStr) return '';
-    const days = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
-    const d = new Date(`${dateStr}T00:00:00`);
-    return !isNaN(d.getDay()) ? days[d.getDay()] : '';
+  // 即時預覽排定課堂清單 (依據月曆所選日期自動推算)
+  readonly previewSessions = computed<PreviewSessionItem[]>(() => {
+    const courseId = this.newSessionCourseId();
+    const existingSessions = this.allSessions().filter(s => s.courseId === courseId);
+    const existingCount = existingSessions.length;
+    const enrolledCount = this.state.courseEnrollments()
+      .filter(e => e.courseId === courseId && e.status === 'active').length;
+
+    const startTime = this.newSessionStartTime();
+    const endTime = this.newSessionEndTime();
+    const venueName = this.newSessionVenue();
+    const venueCost = Number(this.newSessionVenueCost());
+    const teacherFee = Number(this.newSessionTeacherFee());
+    const otherCost = Number(this.newSessionOtherCost());
+    const feePerStudent = Number(this.newSessionFeePerStudent());
+    const maxCapacity = Number(this.newSessionMaxCapacity());
+    const minThreshold = Number(this.newSessionMinThreshold());
+
+    const dates = [...this.selectedDates()].sort((a, b) => a.localeCompare(b));
+
+    return dates.map((dateStr, i) => ({
+      sessionIndex: existingCount + i + 1,
+      date: dateStr,
+      dayOfWeek: this.getDayOfWeekString(dateStr),
+      startTime,
+      endTime,
+      venueName,
+      venueCost,
+      teacherFee,
+      otherCost,
+      feePerStudent,
+      maxCapacity,
+      minThreshold,
+      enrolledCount
+    }));
   });
 
   // 簽名放大查看彈窗
@@ -98,6 +148,25 @@ export class SessionManagementComponent {
         .map(ce => ce.studentId)
     );
     return this.studentsWithPacks().filter(stu => !enrolledIds.has(stu.id));
+  });
+
+  // 既有學員批次多選與搜尋 Signals
+  readonly selectedStudentIdsToEnroll = signal<string[]>([]);
+  readonly existingSearchQuery = signal<string>('');
+
+  readonly filteredAvailableStudents = computed(() => {
+    const query = this.existingSearchQuery().trim().toLowerCase();
+    const students = this.availableStudentsToEnroll();
+    if (!query) return students;
+
+    const queryDigits = query.replace(/\D/g, '');
+    return students.filter(student => {
+      const matchName = student.name.toLowerCase().includes(query);
+      const studentPhoneDigits = student.phone.replace(/\D/g, '');
+      const matchPhone = student.phone.toLowerCase().includes(query) ||
+        (queryDigits.length > 0 && studentPhoneDigits.includes(queryDigits));
+      return matchName || matchPhone;
+    });
   });
 
   // 切換選取的期班課程
@@ -163,7 +232,7 @@ export class SessionManagementComponent {
     });
 
     this.closeCreateCourseModal();
-    alert(`✅ 已成功建立期班課程【${createdCourse.title}】！`);
+    alert(`已成功建立期班課程【${createdCourse.title}】！`);
   }
 
   openDeleteCourseModal(): void {
@@ -190,16 +259,13 @@ export class SessionManagementComponent {
     const courseId = currCourse ? currCourse.id : (this.courses()[0]?.id || 'course-1');
 
     this.newSessionCourseId.set(courseId);
-    this.newSessionDate.set(this.getNextSaturdayDate());
+    this.selectedDates.set([]);
+
     this.newSessionStartTime.set('14:00');
     this.newSessionEndTime.set('15:30');
     this.newSessionVenue.set('敦南日光舞蹈排練室 A 廳');
-    this.newSessionVenueCost.set(currCourse?.defaultVenueCost ?? 2000);
-    this.newSessionTeacherFee.set(currCourse?.defaultTeacherFee ?? 1200);
-    this.newSessionOtherCost.set(0);
-    this.newSessionFeePerStudent.set(currCourse?.defaultFeePerStudent ?? 500);
-    this.newSessionMaxCapacity.set(10);
-    this.newSessionMinThreshold.set(currCourse?.minThreshold ?? 4);
+    const course = this.courses().find(c => c.id === courseId) || currCourse;
+    this.applyCourseDefaults(course);
     this.showCreateSessionModal.set(true);
   }
 
@@ -208,11 +274,28 @@ export class SessionManagementComponent {
     this.newSessionCourseId.set(courseId);
     const course = this.courses().find(c => c.id === courseId);
     if (course) {
-      this.newSessionVenueCost.set(course.defaultVenueCost);
-      this.newSessionTeacherFee.set(course.defaultTeacherFee);
-      this.newSessionFeePerStudent.set(course.defaultFeePerStudent);
-      this.newSessionMinThreshold.set(course.minThreshold);
+      this.applyCourseDefaults(course);
     }
+  }
+
+  private applyCourseDefaults(course?: Course): void {
+    if (!course) return;
+    this.newSessionVenueCost.set(course.defaultVenueCost ?? 2000);
+    this.newSessionTeacherFee.set(course.defaultTeacherFee ?? 1200);
+    this.newSessionFeePerStudent.set(course.defaultFeePerStudent ?? 500);
+    this.newSessionMinThreshold.set(course.minThreshold ?? 4);
+  }
+
+  onSelectedDatesChange(dates: string[]): void {
+    this.selectedDates.set(dates);
+  }
+
+  removeSelectedDate(dateToRemove: string): void {
+    this.selectedDates.set(this.selectedDates().filter(d => d !== dateToRemove));
+  }
+
+  clearSelectedDates(): void {
+    this.selectedDates.set([]);
   }
 
   // 關閉排定新課堂彈窗
@@ -224,7 +307,6 @@ export class SessionManagementComponent {
   // 提交排定新課堂
   submitCreateSession(): void {
     const courseId = this.newSessionCourseId();
-    const date = this.newSessionDate().trim();
     const startTime = this.newSessionStartTime().trim();
     const endTime = this.newSessionEndTime().trim();
     const venueName = this.newSessionVenue().trim();
@@ -235,10 +317,6 @@ export class SessionManagementComponent {
     const maxCapacity = Number(this.newSessionMaxCapacity());
     const minThreshold = Number(this.newSessionMinThreshold());
 
-    if (!date) {
-      this.createSessionError.set('請選擇開課日期');
-      return;
-    }
     if (!startTime || !endTime) {
       this.createSessionError.set('請填寫完整上課時段');
       return;
@@ -260,33 +338,66 @@ export class SessionManagementComponent {
       return;
     }
 
-    const created = this.state.createSession({
-      courseId,
-      date,
-      dayOfWeek: this.newSessionDayOfWeek(),
-      startTime,
-      endTime,
-      venueName,
-      venueCost,
-      teacherFee,
-      otherCost,
-      feePerStudent,
-      maxCapacity,
-      minThreshold
-    });
+    const previews = this.previewSessions();
+    if (previews.length === 0) {
+      this.createSessionError.set('請於月曆中至少點選選取一個開課日期');
+      return;
+    }
 
-    this.closeCreateSessionModal();
-    alert(`✅ 已成功排定【${created.title}】（${created.date} ${created.dayOfWeek}）！`);
+    if (previews.length === 1) {
+      const p = previews[0];
+      const created = this.state.createSession({
+        courseId,
+        date: p.date,
+        dayOfWeek: p.dayOfWeek,
+        startTime,
+        endTime,
+        venueName,
+        venueCost,
+        teacherFee,
+        otherCost,
+        feePerStudent,
+        maxCapacity,
+        minThreshold
+      });
+      this.closeCreateSessionModal();
+      alert(`已成功排定【${created.title}】（${created.date} ${created.dayOfWeek}）！`);
+    } else {
+      const sessionsToCreate: CreateClassSessionParams[] = previews.map(p => ({
+        courseId,
+        date: p.date,
+        dayOfWeek: p.dayOfWeek,
+        startTime,
+        endTime,
+        venueName,
+        venueCost,
+        teacherFee,
+        otherCost,
+        feePerStudent,
+        maxCapacity,
+        minThreshold
+      }));
+      const created = this.state.createSessionsBatch(sessionsToCreate);
+      this.closeCreateSessionModal();
+      alert(`已成功批次排定 ${created.length} 堂課！名冊學員已全數自動登錄。`);
+    }
   }
 
-  private getNextSaturdayDate(): string {
-    const today = new Date();
-    const day = today.getDay();
-    const diff = (6 - day + 7) % 7 || 7;
-    const nextSat = new Date(today);
-    nextSat.setDate(today.getDate() + diff);
+  getDayOfWeekString(dateStr: string): string {
+    if (!dateStr) return '';
+    const days = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+    const parts = dateStr.split('-');
+    if (parts.length < 3) return '';
+    const y = Number(parts[0]);
+    const m = Number(parts[1]);
+    const d = Number(parts[2]);
+    const dateObj = new Date(y, m - 1, d);
+    return !isNaN(dateObj.getDay()) ? days[dateObj.getDay()] : '';
+  }
+
+  formatDate(d: Date): string {
     const pad = (n: number) => String(n).padStart(2, '0');
-    return `${nextSat.getFullYear()}-${pad(nextSat.getMonth() + 1)}-${pad(nextSat.getDate())}`;
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
 
   // 開班門檻不足時一鍵取消順延
@@ -295,7 +406,7 @@ export class SessionManagementComponent {
     if (!s) return;
     if (
       confirm(
-        `⚠️ 確定要順延此課堂嗎？\n\n系統將自動取消本週課堂，並全數退還學員已扣除之堂數，保障教室場租不虧本。`
+        `確定要順延此課堂嗎？\n\n系統將自動取消本週課堂，並全數退還學員已扣除之堂數，保障教室場租不虧本。`
       )
     ) {
       this.state.cancelSessionDueToThreshold(s.id);
@@ -325,6 +436,8 @@ export class SessionManagementComponent {
       return;
     }
     this.enrollError.set(null);
+    this.selectedStudentIdsToEnroll.set([]);
+    this.existingSearchQuery.set('');
     const available = this.availableStudentsToEnroll();
     this.selectedStudentToEnroll.set(available.length > 0 ? available[0].id : '');
     this.enrollMode.set(available.length > 0 ? 'existing' : 'new');
@@ -337,7 +450,48 @@ export class SessionManagementComponent {
 
   closeEnrollModal(): void {
     this.showEnrollModal.set(false);
+    this.selectedStudentIdsToEnroll.set([]);
+    this.existingSearchQuery.set('');
     this.enrollError.set(null);
+  }
+
+  toggleStudentSelection(studentId: string): void {
+    const current = this.selectedStudentIdsToEnroll();
+    if (current.includes(studentId)) {
+      this.selectedStudentIdsToEnroll.set(current.filter(id => id !== studentId));
+    } else {
+      this.selectedStudentIdsToEnroll.set([...current, studentId]);
+    }
+  }
+
+  selectAllAvailableStudents(): void {
+    const availableIds = this.filteredAvailableStudents().map(s => s.id);
+    const currentSet = new Set(this.selectedStudentIdsToEnroll());
+    availableIds.forEach(id => currentSet.add(id));
+    this.selectedStudentIdsToEnroll.set(Array.from(currentSet));
+  }
+
+  clearSelectedStudents(): void {
+    this.selectedStudentIdsToEnroll.set([]);
+  }
+
+  submitBatchEnrollStudents(): void {
+    const course = this.currentCourse();
+    const curr = this.session();
+    const courseId = course?.id || curr?.courseId;
+
+    if (this.selectedStudentIdsToEnroll().length === 0) {
+      this.enrollError.set('請至少選取一位學員');
+      return;
+    }
+
+    if (!courseId) {
+      this.enrollError.set('未指定期班課程');
+      return;
+    }
+
+    this.state.enrollStudentsBatchInCourse(courseId, this.selectedStudentIdsToEnroll());
+    this.closeEnrollModal();
   }
 
   submitEnrollStudent(): void {
@@ -387,7 +541,11 @@ export class SessionManagementComponent {
       return;
     }
 
-    const existing = this.state.students().find(s => s.phone === phone);
+    const phoneDigits = phone.replace(/\D/g, '');
+    const existing = this.state.students().find(s => {
+      const sDigits = s.phone.replace(/\D/g, '');
+      return (phoneDigits.length >= 8 && sDigits === phoneDigits) || s.phone === phone;
+    });
     if (existing) {
       this.enrollError.set(`此電話已被學員【${existing.name}】使用`);
       return;
@@ -400,10 +558,12 @@ export class SessionManagementComponent {
       initialPackType: packType
     });
 
-    if (courseId) {
-      this.state.enrollStudentInCourse(courseId, newStudent.id);
-    } else if (curr) {
-      this.state.enrollStudentInSession(curr.id, newStudent.id);
+    if (newStudent) {
+      if (courseId) {
+        this.state.enrollStudentInCourse(courseId, newStudent.id);
+      } else if (curr) {
+        this.state.enrollStudentInSession(curr.id, newStudent.id);
+      }
     }
 
     this.closeEnrollModal();

@@ -1,9 +1,23 @@
 /* Global CSS Resets & Typography for Triple Dream Ballet (TDB) */
+@use '@angular/material' as mat;
+
+@include mat.core();
+
+$tdb-theme: mat.define-theme((
+  color: (
+    theme-type: light,
+    primary: mat.$rose-palette,
+    tertiary: mat.$rose-palette,
+  )
+));
+
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
 :root {
+  @include mat.all-component-themes($tdb-theme);
+
   --primary: #8e5b69;
   --primary-hover: #784855;
   --primary-light: #f7eef1;
@@ -75,4 +89,27 @@ button, input, select, textarea {
 
 button, select, a {
   touch-action: manipulation;
+}
+
+/* Angular Material Calendar Custom Styles for TDB Quiet Luxury */
+.mat-calendar {
+  font-family: inherit !important;
+  background-color: var(--card-bg, #ffffff) !important;
+  border-radius: var(--radius-lg, 16px);
+}
+
+.mat-calendar-body-cell.tdb-selected-date {
+  .mat-calendar-body-cell-content {
+    background-color: var(--primary, #8e5b69) !important;
+    color: #ffffff !important;
+    border-radius: 50% !important;
+    font-weight: 700 !important;
+    box-shadow: 0 2px 8px rgba(142, 91, 105, 0.35);
+  }
+
+  &.cdk-keyboard-focused .mat-calendar-body-cell-content,
+  &.cdk-program-focused .mat-calendar-body-cell-content,
+  &:hover .mat-calendar-body-cell-content {
+    background-color: var(--primary-hover, #784855) !important;
+  }
 }

@@ -3,7 +3,17 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { BalletApiService, BALLET_API_BASE_URL } from './ballet-api.service';
 import { StudentWithActivePack, TicketPack } from '../types/student.type';
-import { ClassSession, AttendanceRecord, SessionFinancialStats, Course, CreateCourseParams } from '../types/attendance.type';
+import {
+  ClassSession,
+  AttendanceRecord,
+  SessionFinancialStats,
+  Course,
+  CreateCourseParams,
+  CourseEnrollmentBatchRequest,
+  CourseEnrollmentBatchResponse,
+  CourseEnrollmentBatchImportRequest,
+  CourseEnrollmentBatchImportResponse
+} from '../types/attendance.type';
 import {
   CheckInResponse,
   LeaveResponse,
@@ -214,6 +224,57 @@ describe('BalletApiService', () => {
       expect(req.request.method).toBe('DELETE');
       req.flush(mockResponse);
     });
+
+    it('enrollStudentsBatchInCourse() 應發送 POST 請求至 /courses/{courseId}/students/batch', () => {
+      const payload: CourseEnrollmentBatchRequest = {
+        studentIds: ['stu-1', 'stu-2']
+      };
+      const mockResponse: CourseEnrollmentBatchResponse = {
+        courseId: 'course-1',
+        enrolledCount: 2,
+        existingCount: 0,
+        enrollments: [
+          { id: 'enr-1', courseId: 'course-1', studentId: 'stu-1', enrolledAt: '2026-10-20', status: 'active' },
+          { id: 'enr-2', courseId: 'course-1', studentId: 'stu-2', enrolledAt: '2026-10-20', status: 'active' }
+        ]
+      };
+
+      service.enrollStudentsBatchInCourse('course-1', payload).subscribe(res => {
+        expect(res).toEqual(mockResponse);
+      });
+
+      const req = httpMock.expectOne(`${baseUrl}/courses/course-1/students/batch`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual(payload);
+      req.flush(mockResponse);
+    });
+
+    it('batchImportStudentsToCourse() 應發送 POST 請求至 /courses/{courseId}/students/batch-import', () => {
+      const payload: CourseEnrollmentBatchImportRequest = {
+        students: [
+          { name: '王小芬', phone: '0911-222-333', initialPackType: '5_class' }
+        ]
+      };
+      const mockResponse: CourseEnrollmentBatchImportResponse = {
+        courseId: 'course-1',
+        totalProcessed: 1,
+        createdStudentsCount: 1,
+        existingStudentsCount: 0,
+        enrolledCount: 1,
+        enrollments: [
+          { id: 'enr-batch-1', courseId: 'course-1', studentId: 'stu-new-1', enrolledAt: '2026-10-20', status: 'active' }
+        ]
+      };
+
+      service.batchImportStudentsToCourse('course-1', payload).subscribe(res => {
+        expect(res).toEqual(mockResponse);
+      });
+
+      const req = httpMock.expectOne(`${baseUrl}/courses/course-1/students/batch-import`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual(payload);
+      req.flush(mockResponse);
+    });
   });
 
   describe('Class Sessions & Financials Endpoints', () => {
@@ -311,6 +372,70 @@ describe('BalletApiService', () => {
       expect(req.request.method).toBe('POST');
       expect(req.request.body).toEqual({ reason: '人數不足' });
       req.flush(mockResponse);
+    });
+
+    it('createSession() 應發送 POST 請求至 /sessions', () => {
+      const payload = {
+        date: '2026-11-01',
+        dayOfWeek: '週日',
+        startTime: '14:00',
+        endTime: '15:30',
+        venueName: '敦南排練室 A 廳'
+      };
+      const mockSession: ClassSession = {
+        id: 'sess-new',
+        date: '2026-11-01',
+        dayOfWeek: '週日',
+        startTime: '14:00',
+        endTime: '15:30',
+        title: '芭蕾課堂',
+        venueName: '敦南排練室 A 廳',
+        venueCost: 2000,
+        feePerStudent: 500,
+        maxCapacity: 10,
+        minThreshold: 4,
+        status: 'scheduled'
+      };
+
+      service.createSession(payload).subscribe(res => {
+        expect(res).toEqual(mockSession);
+      });
+
+      const req = httpMock.expectOne(`${baseUrl}/sessions`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual(payload);
+      req.flush(mockSession);
+    });
+
+    it('createSessionsBatch() 應發送 POST 請求至 /sessions/batch', () => {
+      const payload = [
+        {
+          date: '2026-11-01',
+          dayOfWeek: '週日',
+          startTime: '14:00',
+          endTime: '15:30',
+          venueName: '敦南排練室 A 廳'
+        },
+        {
+          date: '2026-11-08',
+          dayOfWeek: '週日',
+          startTime: '14:00',
+          endTime: '15:30',
+          venueName: '敦南排練室 A 廳'
+        }
+      ];
+
+      service.createSessionsBatch(payload).subscribe(res => {
+        expect(res.length).toBe(2);
+      });
+
+      const req = httpMock.expectOne(`${baseUrl}/sessions/batch`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ sessions: payload });
+      req.flush([
+        { id: 'sess-1', ...payload[0] },
+        { id: 'sess-2', ...payload[1] }
+      ]);
     });
   });
 

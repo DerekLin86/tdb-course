@@ -1,0 +1,87 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.tdb-calendar-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #edf2f7;
+  box-shadow: 0 4px 16px rgba(45, 62, 80, 0.04);
+  padding: 0.5rem;
+  overflow: hidden;
+
+  ::ng-deep {
+    .mat-calendar {
+      font-family: inherit;
+      width: 100%;
+      background: transparent;
+    }
+
+    .mat-calendar-header {
+      padding: 0.5rem 0.5rem 0.25rem;
+    }
+
+    .mat-calendar-controls {
+      margin: 0;
+    }
+
+    .mat-calendar-period-button {
+      font-weight: 700;
+      color: #263342;
+      font-size: 0.95rem;
+    }
+
+    .mat-calendar-arrow {
+      border-top-color: #8e5b69;
+    }
+
+    .mat-calendar-previous-button,
+    .mat-calendar-next-button {
+      color: #8e5b69;
+
+      &::after {
+        color: #8e5b69;
+      }
+    }
+
+    .mat-calendar-table-header th {
+      color: #8796a5;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding-bottom: 0.5rem;
+    }
+
+    .mat-calendar-body-cell {
+      position: relative;
+    }
+
+    .mat-calendar-body-cell-content {
+      border-radius: 50%;
+      font-size: 0.88rem;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .mat-calendar-body-today:not(.tdb-selected-date) {
+      .mat-calendar-body-cell-content {
+        border-color: #8e5b69;
+        color: #8e5b69;
+        font-weight: 700;
+      }
+    }
+
+    // 選取日期的專屬 Dusty Mauve 高亮樣式
+    .tdb-selected-date {
+      .mat-calendar-body-cell-content {
+        background-color: #8e5b69 !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        box-shadow: 0 2px 8px rgba(142, 91, 105, 0.35);
+      }
+
+      &:hover .mat-calendar-body-cell-content {
+        background-color: #784855 !important;
+      }
+    }
+  }
+}

@@ -16,6 +16,7 @@ import {
   ExtendTicketPackParams,
   ClassSession,
   CreateClassSessionParams,
+  BatchCreateClassSessionsParams,
   AttendanceRecord,
   AttendanceStatus,
   SessionFinancialStats,
@@ -24,6 +25,10 @@ import {
   CourseFinancialStats,
   CourseEnrollment,
   EnrollStudentInCourseRequest,
+  CourseEnrollmentBatchRequest,
+  CourseEnrollmentBatchResponse,
+  CourseEnrollmentBatchImportRequest,
+  CourseEnrollmentBatchImportResponse,
   DeleteCourseEnrollmentResponse,
   CancelThresholdResponse,
   CheckInResponse,
@@ -95,6 +100,12 @@ export class BalletApiService {
   createSession(payload: CreateClassSessionParams): Observable<ClassSession> {
     if (!this.http) return throwError(() => new Error('HttpClient not available'));
     return this.http.post<ClassSession>(`${this.baseUrl}/sessions`, payload);
+  }
+
+  createSessionsBatch(payload: CreateClassSessionParams[] | BatchCreateClassSessionsParams): Observable<ClassSession[]> {
+    if (!this.http) return throwError(() => new Error('HttpClient not available'));
+    const body = Array.isArray(payload) ? { sessions: payload } : payload;
+    return this.http.post<ClassSession[]>(`${this.baseUrl}/sessions/batch`, body);
   }
 
   getSessionById(sessionId: string): Observable<ClassSession> {
@@ -195,6 +206,16 @@ export class BalletApiService {
   enrollStudentInCourse(courseId: string, payload: EnrollStudentInCourseRequest): Observable<CourseEnrollment> {
     if (!this.http) return throwError(() => new Error('HttpClient not available'));
     return this.http.post<CourseEnrollment>(`${this.baseUrl}/courses/${courseId}/students`, payload);
+  }
+
+  enrollStudentsBatchInCourse(courseId: string, payload: CourseEnrollmentBatchRequest): Observable<CourseEnrollmentBatchResponse> {
+    if (!this.http) return throwError(() => new Error('HttpClient not available'));
+    return this.http.post<CourseEnrollmentBatchResponse>(`${this.baseUrl}/courses/${courseId}/students/batch`, payload);
+  }
+
+  batchImportStudentsToCourse(courseId: string, payload: CourseEnrollmentBatchImportRequest): Observable<CourseEnrollmentBatchImportResponse> {
+    if (!this.http) return throwError(() => new Error('HttpClient not available'));
+    return this.http.post<CourseEnrollmentBatchImportResponse>(`${this.baseUrl}/courses/${courseId}/students/batch-import`, payload);
   }
 
   removeStudentFromCourse(courseId: string, studentId: string): Observable<DeleteCourseEnrollmentResponse> {

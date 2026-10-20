@@ -1,14 +1,20 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { BalletStateService, Student } from '@libs/ballet/data-access';
+import { AttendanceRecord, BalletStateService, Student, TicketPack } from '@libs/ballet/data-access';
 import { SignaturePadComponent } from '@libs/shared/ui';
+
+export interface KioskAttendanceItem extends AttendanceRecord {
+  student: Student;
+  activePack?: TicketPack;
+}
 
 @Component({
   selector: 'app-kiosk-checkin',
   standalone: true,
   imports: [CommonModule, SignaturePadComponent],
   templateUrl: './kiosk-checkin.component.html',
-  styleUrls: ['./kiosk-checkin.component.scss']
+  styleUrls: ['./kiosk-checkin.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class KioskCheckinComponent {
   readonly state = inject(BalletStateService);
@@ -20,20 +26,14 @@ export class KioskCheckinComponent {
   readonly financials = this.state.currentSessionFinancials;
   readonly courseProgressList = this.state.currentCourseStudentProgress;
 
-  // 可供簽到的課堂列表（依目前選取期班過濾，排除已取消課堂，並依堂數序號或日期升冪排序）
+  // 可供簽到的課堂列表（依目前選取期班過濾，排除已取消課堂，並依日期與時間升冪排序）
   readonly availableSessions = computed(() => {
     const courseId = this.state.selectedCourseId();
     return this.state
       .sessions()
       .filter((s) => s.status !== 'cancelled' && (!courseId || s.courseId === courseId))
       .slice()
-      .sort((a, b) => {
-        const idxDiff = (a.sessionIndex ?? 0) - (b.sessionIndex ?? 0);
-        if (idxDiff !== 0) return idxDiff;
-        const dateDiff = a.date.localeCompare(b.date);
-        if (dateDiff !== 0) return dateDiff;
-        return a.startTime.localeCompare(b.startTime);
-      });
+      .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
   });
 
   // 簽名彈窗控制 Signal
@@ -69,7 +69,7 @@ export class KioskCheckinComponent {
   }
 
   // 點擊學員卡片
-  openSignModal(item: any): void {
+  openSignModal(item: KioskAttendanceItem): void {
     if (item.status === 'attended') {
       // 已經簽到了，不重複觸發
       return;

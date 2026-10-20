@@ -1226,6 +1226,11 @@
   max-width: 600px;
   border-radius: 24px;
 
+  &.modal-create-session {
+    max-width: 860px;
+    width: 94vw;
+  }
+
   .form-card-header {
     padding: 1.5rem 1.75rem 1.25rem;
     background: #ffffff;
@@ -1270,6 +1275,204 @@
       @extend %modal-error-alert;
     }
 
+    // 視覺化月曆與選定日期雙欄佈局
+    .calendar-selection-layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 1.5rem;
+      background: #fafbfc;
+      border: 1px solid #edf2f7;
+      border-radius: 18px;
+      padding: 1.25rem;
+
+      @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+        padding: 1rem;
+      }
+
+      .calendar-card-col {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+
+        .section-badge-header {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+
+          .badge-tag {
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            color: #8e5b69;
+            background: #f7eef1;
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+          }
+
+          h4 {
+            margin: 0;
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: #334155;
+          }
+        }
+      }
+
+      .selected-dates-col {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 1rem;
+        min-height: 280px;
+
+        .selected-dates-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding-bottom: 0.5rem;
+          border-bottom: 1px solid #f1f5f9;
+
+          .selected-count-badge {
+            font-size: 0.88rem;
+            color: #475569;
+            font-weight: 500;
+
+            strong {
+              color: #8e5b69;
+              font-size: 1.05rem;
+              font-weight: 700;
+            }
+          }
+
+          .btn-clear-dates {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+
+            &:hover {
+              color: #ef4444;
+              background: #fef2f2;
+            }
+          }
+        }
+
+        .empty-selection-placeholder {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          flex: 1;
+          padding: 2rem 1rem;
+          text-align: center;
+
+          .placeholder-title {
+            margin: 0 0 0.25rem;
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: #475569;
+          }
+
+          .placeholder-desc {
+            margin: 0;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            max-width: 220px;
+            line-height: 1.4;
+          }
+        }
+
+        .chips-scroll-container {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          max-height: 310px;
+          overflow-y: auto;
+          padding-right: 0.25rem;
+
+          .selected-date-item {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.45rem 0.65rem;
+            background: #f8fafc;
+            border: 1px solid #edf2f7;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+
+            &:hover {
+              background: #fdf5f7;
+              border-color: #f7d6de;
+            }
+
+            .item-index {
+              font-size: 0.72rem;
+              font-weight: 800;
+              color: #8e5b69;
+              background: #ffffff;
+              border: 1px solid #f1c7d3;
+              width: 22px;
+              height: 22px;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+
+            .item-content {
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+              flex: 1;
+
+              .item-date {
+                font-size: 0.88rem;
+                font-weight: 700;
+                color: #263342;
+              }
+
+              .item-day {
+                font-size: 0.78rem;
+                font-weight: 600;
+                color: #8e5b69;
+                background: #fef2f4;
+                padding: 0.15rem 0.45rem;
+                border-radius: 4px;
+              }
+            }
+
+            .btn-remove-chip {
+              background: transparent;
+              border: none;
+              color: #94a3b8;
+              font-size: 0.85rem;
+              cursor: pointer;
+              padding: 0.2rem;
+              line-height: 1;
+              border-radius: 4px;
+              transition: all 0.15s ease;
+
+              &:hover {
+                color: #ef4444;
+                background: #fee2e2;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 共同設定區塊
     .form-section {
       display: flex;
       flex-direction: column;
@@ -1326,22 +1529,144 @@
         line-height: 1.4;
       }
     }
+
+    // 即時預覽區塊
+    .preview-section {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 1.15rem 1.25rem;
+
+      .preview-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+
+        .preview-badge {
+          font-size: 0.78rem;
+          font-weight: 700;
+          color: #8e5b69;
+          background: #fdf5f7;
+          border: 1px solid #fae8ec;
+          padding: 0.2rem 0.6rem;
+          border-radius: 12px;
+        }
+      }
+
+      .preview-empty-state {
+        padding: 1.5rem;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 0.88rem;
+        background: #f8fafc;
+        border-radius: 10px;
+      }
+
+      .preview-table-wrapper {
+        max-height: 240px;
+        overflow-y: auto;
+        overflow-x: auto;
+        border: 1px solid #edf2f7;
+        border-radius: 10px;
+      }
+
+      .preview-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.84rem;
+
+        th {
+          background: #f8fafc;
+          padding: 0.6rem 0.85rem;
+          text-align: left;
+          font-weight: 600;
+          color: #64748b;
+          border-bottom: 1px solid #e2e8f0;
+          white-space: nowrap;
+          position: sticky;
+          top: 0;
+          z-index: 1;
+        }
+
+        td {
+          padding: 0.6rem 0.85rem;
+          border-bottom: 1px solid #f1f5f9;
+          color: #334155;
+          white-space: nowrap;
+        }
+
+        tbody tr:last-child td {
+          border-bottom: none;
+        }
+
+        tbody tr:hover {
+          background: #f8fafc;
+        }
+
+        .col-index {
+          font-weight: 700;
+          color: #8e5b69;
+        }
+
+        .col-date {
+          .weekday-pill {
+            margin-left: 0.4rem;
+            font-size: 0.75rem;
+            color: #64748b;
+            background: #e2e8f0;
+            padding: 0.15rem 0.4rem;
+            border-radius: 6px;
+          }
+        }
+
+        .enrolled-badge {
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: #0284c7;
+          background: #f0f9ff;
+          border: 1px solid #e0f2fe;
+          padding: 0.15rem 0.5rem;
+          border-radius: 6px;
+        }
+
+        .col-cap {
+          color: #64748b;
+        }
+      }
+    }
   }
 
   .form-card-footer {
     @extend %modal-footer-base;
     padding: 1.25rem 1.75rem;
+
+    .btn-submit:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
   }
 }
 
 // --- 手動加入學員彈窗 ---
 .modal-card.modal-enroll {
+  --primary: #8e5b69;
+  --primary-hover: #784855;
+  --text-title: #263342;
+  --text-body: #546474;
+
   @extend %modal-card-base;
-  max-width: 500px;
+  max-width: min(740px, 94vw);
+  max-height: 90vh;
+  max-height: 90dvh;
+  display: flex;
+  flex-direction: column;
   border-radius: 24px;
 
   .modal-header {
-    padding: 1.5rem 1.75rem 1rem;
+    padding: 1.35rem 1.75rem 1rem;
     border-bottom: 1px solid #edf2f7;
     display: flex;
     justify-content: space-between;
@@ -1349,9 +1674,10 @@
 
     h3 {
       margin: 0;
-      font-size: 1.25rem;
+      font-size: 1.2rem;
       font-weight: 700;
-      color: #1e293b;
+      color: var(--text-title);
+      letter-spacing: -0.01em;
     }
 
     .btn-close {
@@ -1368,23 +1694,37 @@
 
     .seg-btn {
       flex: 1;
-      padding: 0.6rem 0.5rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      padding: 0.65rem 0.5rem;
       border: none;
       background: transparent;
       font-size: 0.9rem;
       font-weight: 600;
-      color: #64748b;
+      color: var(--text-body);
       cursor: pointer;
       border-bottom: 2px solid transparent;
       transition: all 0.2s ease;
 
       &.active {
-        color: #8e5b69;
-        border-bottom-color: #8e5b69;
+        color: var(--primary);
+        border-bottom-color: var(--primary);
       }
 
       &:hover:not(.active) {
-        color: #1e293b;
+        color: var(--text-title);
+      }
+
+      .seg-badge {
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 0.15rem 0.45rem;
+        border-radius: 999px;
+        background: rgba(142, 91, 105, 0.12);
+        color: var(--primary);
+        line-height: 1;
       }
     }
   }
@@ -1403,25 +1743,26 @@
     .modal-desc {
       margin: 0;
       font-size: 0.88rem;
-      color: #64748b;
-      line-height: 1.4;
+      color: var(--text-body);
+      line-height: 1.45;
 
       strong {
-        color: #1e293b;
+        color: var(--text-title);
+        font-weight: 700;
       }
     }
 
     .empty-available-box {
       background: #f8fafc;
       border: 1px dashed #cbd5e1;
-      border-radius: 12px;
-      padding: 1.5rem;
+      border-radius: 14px;
+      padding: 1.75rem;
       text-align: center;
 
       p {
         margin: 0;
         font-weight: 600;
-        color: #334155;
+        color: var(--text-title);
         font-size: 0.95rem;
       }
 
@@ -1429,10 +1770,245 @@
         display: block;
         margin-top: 0.35rem;
         font-size: 0.82rem;
-        color: #64748b;
+        color: var(--text-body);
       }
     }
 
+    // --- Tab 1: 選擇現有學員 (批次多選) ---
+    .existing-search-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+
+      .search-input-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+
+        .search-input {
+          @extend %modal-form-input;
+          padding-right: 2.25rem;
+        }
+
+        .btn-clear-search {
+          position: absolute;
+          right: 0.75rem;
+          background: transparent;
+          border: none;
+          color: #94a3b8;
+          cursor: pointer;
+          padding: 0.25rem;
+          font-size: 0.85rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          transition: all 0.15s ease;
+
+          &:hover {
+            color: #475569;
+            background: #e2e8f0;
+          }
+        }
+      }
+
+      .batch-select-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+
+        .btn-action-pill {
+          padding: 0.32rem 0.75rem;
+          border-radius: 999px;
+          border: 1px solid rgba(142, 91, 105, 0.3);
+          background: #ffffff;
+          color: var(--primary);
+          font-size: 0.82rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: #fdf5f7;
+            border-color: var(--primary);
+          }
+
+          &.pill-subtle {
+            border-color: #e2e8f0;
+            color: var(--text-body);
+
+            &:hover {
+              background: #f1f5f9;
+              border-color: #cbd5e1;
+              color: var(--text-title);
+            }
+          }
+        }
+
+        .selected-count-pill {
+          margin-left: auto;
+          font-size: 0.82rem;
+          color: var(--text-body);
+          background: #f8fafc;
+          padding: 0.3rem 0.75rem;
+          border-radius: 999px;
+          border: 1px solid #edf2f7;
+
+          strong {
+            color: var(--primary);
+            font-weight: 700;
+          }
+        }
+      }
+    }
+
+    .student-select-list {
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding-right: 0.25rem;
+
+      .no-filter-match {
+        padding: 1.75rem;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 0.88rem;
+        background: #f8fafc;
+        border-radius: 12px;
+
+        p {
+          margin: 0;
+        }
+      }
+
+      .student-select-card {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        padding: 0.75rem 1rem;
+        border-radius: 12px;
+        border: 1px solid #edf2f7;
+        background: #ffffff;
+        cursor: pointer;
+        transition: all 0.15s ease;
+
+        &:hover {
+          background: #fafbfc;
+          border-color: #d1d5db;
+        }
+
+        &.selected {
+          background: #fdf5f7;
+          border-color: rgba(142, 91, 105, 0.35);
+          box-shadow: 0 2px 8px rgba(142, 91, 105, 0.08);
+        }
+
+        .custom-checkbox {
+          display: inline-flex;
+          align-items: center;
+          cursor: pointer;
+          position: relative;
+
+          input[type="checkbox"] {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+            margin: 0;
+            pointer-events: none;
+          }
+
+          .checkbox-indicator {
+            width: 20px;
+            height: 20px;
+            min-width: 20px;
+            border-radius: 6px;
+            border: 1.5px solid #cbd5e1;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+
+            &::after {
+              content: '';
+              width: 5px;
+              height: 10px;
+              border: solid #ffffff;
+              border-width: 0 2px 2px 0;
+              transform: rotate(45deg) translate(-1px, -1px);
+              opacity: 0;
+              transition: opacity 0.15s ease;
+            }
+          }
+
+          input[type="checkbox"]:checked + .checkbox-indicator {
+            background: var(--primary);
+            border-color: var(--primary);
+
+            &::after {
+              opacity: 1;
+            }
+          }
+        }
+
+        .student-card-info {
+          flex: 1;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 0.75rem;
+
+          .student-main {
+            display: flex;
+            align-items: baseline;
+            gap: 0.65rem;
+
+            .student-name {
+              font-size: 0.95rem;
+              font-weight: 600;
+              color: var(--text-title);
+            }
+
+            .student-phone {
+              font-size: 0.82rem;
+              color: #7b8b9c;
+            }
+          }
+
+          .student-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+
+            .ticket-balance {
+              font-size: 0.82rem;
+              color: var(--text-body);
+
+              &.balance-zero {
+                color: #dc2626;
+                font-weight: 600;
+              }
+            }
+
+            .badge-warning-subtle {
+              font-size: 0.75rem;
+              font-weight: 600;
+              padding: 0.15rem 0.5rem;
+              border-radius: 6px;
+              background: #fffbeb;
+              color: #b45309;
+              border: 1px solid #fef3c7;
+            }
+          }
+        }
+      }
+    }
+
+    // --- Tab 2: 表單控制項 (+ 建立單筆新學員) ---
     .form-group {
       display: flex;
       flex-direction: column;
@@ -1455,6 +2031,84 @@
   .modal-footer {
     @extend %modal-footer-base;
     padding: 1.25rem 1.75rem;
+
+    .btn-submit:disabled,
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+  }
+
+  @include iphone {
+    max-width: 96vw;
+    width: 96vw;
+    max-height: 94vh;
+    max-height: 94dvh;
+
+    .modal-header {
+      padding: 1.1rem 1.25rem 0.85rem;
+
+      h3 {
+        font-size: 1.05rem;
+      }
+    }
+
+    .modal-segmented-nav {
+      padding: 0.5rem 1rem 0;
+
+      .seg-btn {
+        font-size: 0.82rem;
+        padding: 0.5rem 0.25rem;
+      }
+    }
+
+    .modal-body {
+      padding: 1rem 1.25rem;
+      gap: 1rem;
+
+      .existing-search-bar {
+        .batch-select-actions {
+          justify-content: space-between;
+
+          .selected-count-pill {
+            margin-left: 0;
+            width: 100%;
+            text-align: center;
+          }
+        }
+      }
+
+      .student-select-list {
+        max-height: 240px;
+
+        .student-select-card {
+          padding: 0.65rem 0.75rem;
+
+          .student-card-info {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.25rem;
+
+            .student-meta {
+              align-self: flex-start;
+            }
+          }
+        }
+      }
+    }
+
+    .modal-footer {
+      padding: 1rem 1.25rem;
+      flex-direction: column-reverse;
+      gap: 0.5rem;
+
+      button {
+        width: 100%;
+        justify-content: center;
+      }
+    }
   }
 }
 
