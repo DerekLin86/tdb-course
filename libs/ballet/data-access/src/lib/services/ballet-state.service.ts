@@ -1759,6 +1759,42 @@ export class BalletStateService {
     return finalCreatedSessions;
   }
 
+  // 刪除指定課堂班次
+  deleteSession(sessionId: string): void {
+    const sessionToDelete = this.sessions().find(s => s.id === sessionId);
+    if (!sessionToDelete) return;
+
+    const courseId = sessionToDelete.courseId;
+
+    // 1. 自 sessions 移除
+    let remainingSessions = this.sessions().filter(s => s.id !== sessionId);
+
+    // 2. 級聯清理出勤記錄
+    this.attendance.set(this.attendance().filter(a => a.sessionId !== sessionId));
+
+    // 3. 若隸屬於期班，重新計算剩餘課堂序號 sessionIndex 與標題
+    if (courseId) {
+      remainingSessions = this.reindexCourseSessions(courseId, remainingSessions);
+    }
+    this.sessions.set(remainingSessions);
+
+    // 4. 若當前選取的課堂正是被刪除的課堂，平滑回退至所屬期班的第一堂課或空字串
+    if (this.selectedSessionId() === sessionId) {
+      const currentCourseSessions = remainingSessions.filter(s => s.courseId === this.selectedCourseId());
+      this.selectedSessionId.set(currentCourseSessions[0]?.id || '');
+    }
+
+    // 5. 背景非同步同步至後端 API
+    if (this.api?.isAvailable) {
+      this.api.deleteSession(sessionId).subscribe({
+        error: (err) => {
+          console.warn('Background delete session sync failed', err);
+          this.lastSyncError.set(err.message || '刪除課堂同步失敗');
+        }
+      });
+    }
+  }
+
   // 切換當前選定的課堂
   setSelectedSession(sessionId: string): void {
     this.selectedSessionId.set(sessionId);

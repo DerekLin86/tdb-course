@@ -129,6 +129,11 @@ export class BalletApiService {
     });
   }
 
+  deleteSession(sessionId: string): Observable<{ success: boolean; message: string }> {
+    if (!this.http) return throwError(() => new Error('HttpClient not available'));
+    return this.http.delete<{ success: boolean; message: string }>(`${this.baseUrl}/sessions/${sessionId}`);
+  }
+
   // 3. Attendance & Kiosk Check-In
   getSessionAttendance(sessionId: string): Observable<AttendanceRecord[]> {
     if (!this.http) return of([]);

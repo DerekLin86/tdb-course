@@ -249,4 +249,72 @@ describe('SessionManagementComponent (期班課堂管理與學員名冊加入單
       expect(component.showEnrollModal()).toBeFalse();
     });
   });
+
+  describe('7. 刪除課堂彈窗與操作 (Delete Session Modal & Operations)', () => {
+    it('openDeleteSessionModal() 未帶參數時，應預設將目前選定的 session 設為 sessionToDelete 並開啟彈窗', () => {
+      const current = component.session();
+      expect(current).toBeTruthy();
+
+      component.openDeleteSessionModal();
+
+      expect(component.showDeleteSessionModal()).toBeTrue();
+      expect(component.sessionToDelete()).toEqual(current);
+    });
+
+    it('openDeleteSessionModal() 帶入指定 session 時，應將該 session 設為 sessionToDelete 並開啟彈窗', () => {
+      const all = stateService.sessions();
+      const specificSession = all[1];
+      expect(specificSession).toBeTruthy();
+
+      component.openDeleteSessionModal(specificSession);
+
+      expect(component.showDeleteSessionModal()).toBeTrue();
+      expect(component.sessionToDelete()).toEqual(specificSession);
+    });
+
+    it('openDeleteSessionModal() 當無任何課堂且未傳參數時，不應開啟彈窗', () => {
+      stateService.sessions.set([]);
+      fixture.detectChanges();
+
+      component.openDeleteSessionModal();
+
+      expect(component.showDeleteSessionModal()).toBeFalse();
+      expect(component.sessionToDelete()).toBeNull();
+    });
+
+    it('closeDeleteSessionModal() 應關閉彈窗並將 sessionToDelete 清空為 null', () => {
+      component.openDeleteSessionModal();
+      expect(component.showDeleteSessionModal()).toBeTrue();
+      expect(component.sessionToDelete()).toBeTruthy();
+
+      component.closeDeleteSessionModal();
+
+      expect(component.showDeleteSessionModal()).toBeFalse();
+      expect(component.sessionToDelete()).toBeNull();
+    });
+
+    it('confirmDeleteSession() 應呼叫 state.deleteSession 刪除指定課堂並關閉彈窗', () => {
+      const deleteSpy = spyOn(stateService, 'deleteSession').and.callThrough();
+      const current = component.session();
+      expect(current).toBeTruthy();
+
+      component.openDeleteSessionModal();
+      component.confirmDeleteSession();
+
+      expect(deleteSpy).toHaveBeenCalledWith(current!.id);
+      expect(component.showDeleteSessionModal()).toBeFalse();
+      expect(component.sessionToDelete()).toBeNull();
+    });
+
+    it('confirmDeleteSession() 當無 target 課堂時應直接返回不進行任何操作', () => {
+      const deleteSpy = spyOn(stateService, 'deleteSession').and.callThrough();
+      stateService.sessions.set([]);
+      fixture.detectChanges();
+
+      component.confirmDeleteSession();
+
+      expect(deleteSpy).not.toHaveBeenCalled();
+      expect(component.showDeleteSessionModal()).toBeFalse();
+    });
+  });
 });

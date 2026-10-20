@@ -69,3 +69,9 @@ class CancelThresholdRequest(CamelModel):
 class CancelThresholdResponse(CamelModel):
     message: str
     refunded_count: int
+
+
+class SessionDeleteResponse(CamelModel):
+    success: bool = True
+    message: str
+

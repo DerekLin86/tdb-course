@@ -519,7 +519,8 @@ describe('BalletStateService (後端 API 整合與非同步同步機制)', () =>
       'updateStudent',
       'deleteStudent',
       'resetSystem',
-      'deleteCourse'
+      'deleteCourse',
+      'deleteSession'
     ], {
       isAvailable: true,
       baseUrl: 'http://localhost:8000/api/v1'
@@ -550,6 +551,7 @@ describe('BalletStateService (後端 API 整合與非同步同步機制)', () =>
       status: 'active'
     }));
     mockApi.deleteCourse.and.returnValue(of({ success: true, message: '課程已成功刪除' }));
+    mockApi.deleteSession.and.returnValue(of({ success: true, message: '課堂已成功刪除' }));
     mockApi.getStudents.and.returnValue(of(mockStudents));
     mockApi.getSessions.and.returnValue(of(mockSessions));
     mockApi.getSessionAttendance.and.returnValue(of(mockAttendance));
@@ -735,6 +737,12 @@ describe('BalletStateService (後端 API 整合與非同步同步機制)', () =>
     service.refreshFromBackend();
     service.deleteCourse('course-1');
     expect(mockApi.deleteCourse).toHaveBeenCalledWith('course-1');
+  });
+
+  it('deleteSession() 應非同步呼叫後端 API deleteSession', () => {
+    service.refreshFromBackend();
+    service.deleteSession('session-remote-1');
+    expect(mockApi.deleteSession).toHaveBeenCalledWith('session-remote-1');
   });
 
   it('createSessionsBatch() 應非同步呼叫後端 API createSessionsBatch', () => {
@@ -1020,6 +1028,109 @@ describe('【多堂課課程關聯、全期財務損益與學員出勤進度】'
     expect(service.sessions()).toEqual(sessionsBefore);
     expect(service.attendance()).toEqual(attendanceBefore);
     expect(service.selectedCourseId()).toBe(selectedBefore);
+  });
+
+  it('deleteSession() 應成功移除指定課堂並連動級聯清理該課堂之簽到出勤紀錄', () => {
+    const sessionToDelete = 'session-upcoming';
+    const targetSession = service.sessions().find(s => s.id === sessionToDelete);
+    expect(targetSession).toBeTruthy();
+
+    const relatedAttBefore = service.attendance().filter(a => a.sessionId === sessionToDelete);
+    expect(relatedAttBefore.length).toBeGreaterThan(0);
+
+    service.deleteSession(sessionToDelete);
+
+    expect(service.sessions().some(s => s.id === sessionToDelete)).toBeFalse();
+    expect(service.attendance().some(a => a.sessionId === sessionToDelete)).toBeFalse();
+  });
+
+  it('deleteSession() 應重新編排同期班剩餘課堂序號 (reindexCourseSessions) 與課堂標題', () => {
+    const testCourseId = 'course-test-reindex';
+    service.courses.set([
+      ...service.courses(),
+      {
+        id: testCourseId,
+        title: '芭蕾測試班',
+        description: '芭蕾測試班課堂描述',
+        totalSessions: 3,
+        defaultVenueCost: 2000,
+        defaultTeacherFee: 1200,
+        defaultFeePerStudent: 500,
+        minThreshold: 4,
+        status: 'active'
+      }
+    ]);
+    const sess1 = service.createSession({
+      courseId: testCourseId,
+      date: '2026-11-01',
+      startTime: '10:00',
+      endTime: '11:30',
+      title: '芭蕾測試班 (第 1 堂)',
+      venueName: '敦南排練室'
+    });
+    const sess2 = service.createSession({
+      courseId: testCourseId,
+      date: '2026-11-08',
+      startTime: '10:00',
+      endTime: '11:30',
+      title: '芭蕾測試班 (第 2 堂)',
+      venueName: '敦南排練室'
+    });
+    const sess3 = service.createSession({
+      courseId: testCourseId,
+      date: '2026-11-15',
+      startTime: '10:00',
+      endTime: '11:30',
+      title: '芭蕾測試班 (第 3 堂)',
+      venueName: '敦南排練室'
+    });
+
+    // 刪除第 2 堂課
+    service.deleteSession(sess2.id);
+
+    const remaining = service.sessions().filter(s => s.courseId === testCourseId);
+    expect(remaining.length).toBe(2);
+
+    const updatedSess1 = remaining.find(s => s.id === sess1.id);
+    const updatedSess3 = remaining.find(s => s.id === sess3.id);
+
+    expect(updatedSess1?.sessionIndex).toBe(1);
+    expect(updatedSess1?.title).toContain('第 1 堂');
+    expect(updatedSess3?.sessionIndex).toBe(2);
+    expect(updatedSess3?.title).toContain('第 2 堂');
+  });
+
+  it('deleteSession() 刪除當前選定之課堂時，應平滑回退選取同期班的第一堂課或空字串', () => {
+    service.setSelectedCourse('course-1');
+    const courseSessions = service.sessions().filter(s => s.courseId === 'course-1');
+    expect(courseSessions.length).toBeGreaterThan(1);
+
+    const firstSession = courseSessions[0];
+    const secondSession = courseSessions[1];
+
+    service.setSelectedSession(firstSession.id);
+    expect(service.selectedSessionId()).toBe(firstSession.id);
+
+    service.deleteSession(firstSession.id);
+    expect(service.selectedSessionId()).toBe(secondSession.id);
+
+    const remaining = service.sessions().filter(s => s.courseId === 'course-1');
+    for (const s of remaining) {
+      service.deleteSession(s.id);
+    }
+    expect(service.selectedSessionId()).toBe('');
+  });
+
+  it('deleteSession() 傳入不存在之 sessionId 時應直接 return 不影響現有狀態', () => {
+    const sessionsBefore = service.sessions();
+    const attendanceBefore = service.attendance();
+    const selectedBefore = service.selectedSessionId();
+
+    service.deleteSession('non-existent-session-id');
+
+    expect(service.sessions()).toEqual(sessionsBefore);
+    expect(service.attendance()).toEqual(attendanceBefore);
+    expect(service.selectedSessionId()).toBe(selectedBefore);
   });
 
   it('currentCourseSessions 與可預約課堂清單應依日期與時間嚴格升冪排序 (Strict date sorting)', () => {

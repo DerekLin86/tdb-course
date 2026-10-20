@@ -3,6 +3,8 @@ Tests for class session batch creation, chronological date ordering,
 automatic course roster population, and chronological session index re-indexing.
 """
 from fastapi.testclient import TestClient
+from database import Session
+from models.attendance import AttendanceRecord
 
 
 def test_batch_create_sessions_and_date_sorting(client: TestClient):
@@ -306,3 +308,113 @@ def test_chronological_session_reindexing(client: TestClient):
     assert [s["date"] for s in course_sessions] == expected_dates
     for s, idx in zip(course_sessions, expected_indices):
         assert f"第 {idx} 堂" in s["title"]
+
+
+def test_delete_session_and_cascade_reindex(client: TestClient, db_session: Session):
+    """Test deleting a session within a course:
+    - Creates a course and 3 sessions in batch
+    - Adds student enrollments (which automatically populates attendance records)
+    - Deletes the 2nd session via DELETE /api/v1/sessions/{session_id}
+    - Verifies 200 response, that the 2nd session is deleted, associated attendance records deleted
+    - Verifies remaining course sessions are chronologically re-indexed to 1 and 2 with updated titles
+    - Verifies deleting non-existent session returns 404
+    """
+    # 1. Create a course
+    c_resp = client.post("/api/v1/courses", json={
+        "id": "course-del-reindex-1",
+        "title": "週六古典芭蕾精修班",
+        "totalSessions": 3,
+    })
+    assert c_resp.status_code == 201
+
+    # 2. Create a student and enroll in course (which will auto-populate attendance for sessions)
+    s_resp = client.post("/api/v1/students", json={
+        "id": "stu-del-reindex-1",
+        "name": "張芷晴",
+        "phone": "0988-123-456",
+    })
+    assert s_resp.status_code == 201
+
+    enr_resp = client.post("/api/v1/courses/course-del-reindex-1/students", json={
+        "studentId": "stu-del-reindex-1",
+    })
+    assert enr_resp.status_code == 201
+
+    # 3. Batch create 3 sessions
+    batch_payload = {
+        "sessions": [
+            {
+                "id": "session-del-w1",
+                "courseId": "course-del-reindex-1",
+                "date": "2026-09-05",
+                "dayOfWeek": "週六",
+                "startTime": "10:00",
+                "endTime": "11:30",
+                "title": "週六古典芭蕾精修班 (第 1 堂)",
+                "venueName": "敦南排練室",
+            },
+            {
+                "id": "session-del-w2",
+                "courseId": "course-del-reindex-1",
+                "date": "2026-09-12",
+                "dayOfWeek": "週六",
+                "startTime": "10:00",
+                "endTime": "11:30",
+                "title": "週六古典芭蕾精修班 (第 2 堂)",
+                "venueName": "敦南排練室",
+            },
+            {
+                "id": "session-del-w3",
+                "courseId": "course-del-reindex-1",
+                "date": "2026-09-19",
+                "dayOfWeek": "週六",
+                "startTime": "10:00",
+                "endTime": "11:30",
+                "title": "週六古典芭蕾精修班 (第 3 堂)",
+                "venueName": "敦南排練室",
+            },
+        ]
+    }
+    b_resp = client.post("/api/v1/sessions/batch", json=batch_payload)
+    assert b_resp.status_code == 201
+
+    # Verify session 2 has attendance record
+    att2_resp = client.get("/api/v1/sessions/session-del-w2/attendance")
+    assert att2_resp.status_code == 200
+    assert len(att2_resp.json()) == 1
+
+    # 4. Delete the 2nd session
+    del_resp = client.delete("/api/v1/sessions/session-del-w2")
+    assert del_resp.status_code == 200
+    del_data = del_resp.json()
+    assert del_data["success"] is True
+    assert "課堂【週六古典芭蕾精修班 (第 2 堂)】及所屬出勤紀錄已安全刪除" in del_data["message"]
+
+    # 5. Verify the 2nd session is deleted
+    get2_resp = client.get("/api/v1/sessions/session-del-w2")
+    assert get2_resp.status_code == 404
+
+    # 6. Verify associated attendance records for session 2 are deleted
+    remaining_att = db_session.query(AttendanceRecord).filter(
+        AttendanceRecord.session_id == "session-del-w2"
+    ).all()
+    assert len(remaining_att) == 0
+
+    # 7. Verify remaining sessions in the course are re-indexed to 1 and 2
+    w1_resp = client.get("/api/v1/sessions/session-del-w1")
+    assert w1_resp.status_code == 200
+    w1_data = w1_resp.json()
+    assert w1_data["sessionIndex"] == 1
+    assert w1_data["title"] == "週六古典芭蕾精修班 (第 1 堂)"
+
+    w3_resp = client.get("/api/v1/sessions/session-del-w3")
+    assert w3_resp.status_code == 200
+    w3_data = w3_resp.json()
+    assert w3_data["sessionIndex"] == 2
+    assert w3_data["title"] == "週六古典芭蕾精修班 (第 2 堂)"
+
+    # 8. Verify deleting non-existent session returns 404
+    non_existent_resp = client.delete("/api/v1/sessions/non-existent-session-id")
+    assert non_existent_resp.status_code == 404
+    assert "查無此課堂 (Session ID: non-existent-session-id)" in non_existent_resp.json()["detail"]
+

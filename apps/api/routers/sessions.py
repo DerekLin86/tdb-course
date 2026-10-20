@@ -18,6 +18,7 @@ from schemas.session import (
     SessionFinancialStatsResponse,
     CancelThresholdRequest,
     CancelThresholdResponse,
+    SessionDeleteResponse,
 )
 from services.financial_service import FinancialService
 from services.attendance_service import AttendanceService
@@ -108,6 +109,11 @@ def _reindex_course_sessions(
         for s in pending_sessions:
             if s.course_id == course_id:
                 sessions_map[s.id] = s
+
+    # Filter out any sessions marked for deletion in the current DB transaction
+    deleted_ids = {getattr(d, 'id', None) for d in getattr(db, '_deleted', [])}
+    for d_id in deleted_ids:
+        sessions_map.pop(d_id, None)
 
     all_sessions = list(sessions_map.values())
     all_sessions.sort(key=lambda s: (s.date, s.start_time))
@@ -239,6 +245,42 @@ def get_session(session_id: str, db: Session = Depends(get_db)):
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="查無該課堂")
     return ClassSessionResponse.model_validate(session)
+
+
+@router.delete("/{session_id}", response_model=SessionDeleteResponse, status_code=status.HTTP_200_OK)
+def delete_session(session_id: str, db: Session = Depends(get_db)):
+    """Delete a class session, cascade-remove its attendance records,
+    and chronologically re-index remaining course sessions.
+    """
+    session = db.get(ClassSession, session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"查無此課堂 (Session ID: {session_id})",
+        )
+    course_id = session.course_id
+    session_title = session.title or ""
+
+    # Cascade-delete associated attendance records
+    attendance_records = db.query(AttendanceRecord).filter(
+        AttendanceRecord.session_id == session.id
+    ).all()
+    for att in attendance_records:
+        db.delete(att)
+
+    # Delete session
+    db.delete(session)
+
+    # Re-index remaining sessions in the course if course_id is present
+    if course_id:
+        _reindex_course_sessions(db, course_id)
+
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"課堂【{session_title}】及所屬出勤紀錄已安全刪除",
+    }
 
 
 @router.get("/{session_id}/financials", response_model=SessionFinancialStatsResponse)

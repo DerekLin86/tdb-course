@@ -63,6 +63,10 @@ export class SessionManagementComponent {
   // 刪除期班確認彈窗 Signals
   readonly showDeleteCourseModal = signal<boolean>(false);
 
+  // 刪除課堂確認彈窗 Signals
+  readonly showDeleteSessionModal = signal<boolean>(false);
+  readonly sessionToDelete = signal<ClassSession | null>(null);
+
   // 排定新課堂彈窗與表單 Signals
   readonly showCreateSessionModal = signal<boolean>(false);
   readonly newSessionCourseId = signal<string>('course-1');
@@ -250,6 +254,26 @@ export class SessionManagementComponent {
     if (!curr) return;
     this.state.deleteCourse(curr.id);
     this.closeDeleteCourseModal();
+  }
+
+  openDeleteSessionModal(session?: ClassSession): void {
+    const target = session || this.session();
+    if (target) {
+      this.sessionToDelete.set(target);
+      this.showDeleteSessionModal.set(true);
+    }
+  }
+
+  closeDeleteSessionModal(): void {
+    this.showDeleteSessionModal.set(false);
+    this.sessionToDelete.set(null);
+  }
+
+  confirmDeleteSession(): void {
+    const target = this.sessionToDelete() || this.session();
+    if (!target) return;
+    this.state.deleteSession(target.id);
+    this.closeDeleteSessionModal();
   }
 
   // 開啟排定新課堂彈窗

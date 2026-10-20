@@ -284,7 +284,8 @@
     }
   }
 
-  .btn-delete-course {
+  .btn-delete-course,
+  .btn-delete-session {
     display: inline-flex;
     align-items: center;
     background: #ffffff;
@@ -377,6 +378,7 @@
 
       .btn-create-course,
       .btn-create-session,
+      .btn-delete-session,
       .btn-delete-course {
         justify-content: center;
         min-height: var(--touch-target-min, 44px);
@@ -429,6 +431,7 @@
 
     .btn-create-course,
     .btn-create-session,
+    .btn-delete-session,
     .btn-delete-course {
       justify-content: center;
       min-height: 44px;
@@ -2112,8 +2115,9 @@
   }
 }
 
-// --- 刪除期班確認彈窗 ---
-.modal-card.modal-delete-course {
+// --- 刪除期班與課堂確認彈窗 ---
+.modal-card.modal-delete-course,
+.modal-card.modal-delete-session {
   @extend %modal-card-base;
   max-width: 520px;
   border-radius: 24px;
